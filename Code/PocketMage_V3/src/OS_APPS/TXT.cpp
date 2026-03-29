@@ -446,6 +446,52 @@ void deleteLinesMultiple(ulong index, int count) {
   document.lineCount -= actualCount;
 }
 
+int getLineEinkWidth(Line& line) {
+  int width = 0;
+  char style = line.type;
+
+  // 1. Account for the structural left-side padding
+  if (style == '>') width += SPECIAL_PADDING;
+  else if (style == 'U' || style == 'O' || style == 'u' || style == 'o') width += 2 * SPECIAL_PADDING;
+  else if (style == 'C') width += (SPECIAL_PADDING / 2);
+
+  // 2. Iterate through the UTF-8 text and measure glyphs
+  bool bold = false;
+  bool italic = false;
+  uint16_t i = 0;
+
+  while (i < line.len) {
+    uint16_t unicode = decodeUTF8(line.text, &i, line.len);
+
+    // Handle inline formatting toggles (stars have 0 visual width)
+    if (unicode == '*') {
+      int starCount = 1;
+      while (i < line.len && line.text[i] == '*' && starCount < 3) {
+        starCount++; 
+        i++;
+      }
+      switch (starCount) {
+        case 1: italic = !italic; break;
+        case 2: bold = !bold; break;
+        case 3: bold = !bold; italic = !italic; break;
+      }
+      continue; 
+    }
+
+    // Determine active font and map to your custom 8-bit glyph index
+    const GFXfont* font = pickFont(style, bold, italic);
+    uint8_t mappedChar = mapUnicodeToFontIndex(unicode);
+
+    // Add the exact pixel width of this specific character
+    width += getFastCharWidth(mappedChar, font);
+  }
+
+  // 3. Account for the structural right-side padding (Code blocks have right-side borders)
+  if (style == 'C') width += (SPECIAL_PADDING / 2);
+
+  return width;
+}
+
 int findWrapIndex(const String& content, int startIndex, char style) {
   int availableWidth = display.width() - DISPLAY_WIDTH_BUFFER;
 
@@ -1520,6 +1566,19 @@ void editorOledDisplay(Line& line, uint16_t cursor_pos, bool currentlyTyping) {
     }
 
     if (cursor_pos == i) u8g2.drawVLine(xpos, 1, 22);
+  }
+
+  // Draw progress bar if on the last line
+  if (currentLineNum == (document.lineCount - 1)) {
+    int width = getLineEinkWidth(line);
+    long progress = map(width,0,display.width(),0,u8g2.getDisplayWidth());
+
+    if (progress > 0) {
+      u8g2.drawHLine(0,0,progress);
+      u8g2.drawHLine(0,1,progress);
+      u8g2.drawVLine(0,0,2);
+      u8g2.drawVLine(u8g2.getDisplayWidth()-1,0,2);
+    }
   }
 
   if (currentlyTyping) toolBar(line, currentWordBold, currentWordItalic);
