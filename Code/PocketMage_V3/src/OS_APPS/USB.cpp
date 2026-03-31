@@ -168,6 +168,7 @@ void USB_INIT() {
   if (err != ESP_OK) {
     ESP_LOGE(TAG, "Card init failed: %s\n", esp_err_to_name(err));
     OLED().sysMessage("Card init failed: " + String(esp_err_to_name(err)),2000);
+    OLED().sysMessage("Please type 'sdreset' in home",2000);
     free(card);
     card = nullptr;
     sdmmc_host_deinit();

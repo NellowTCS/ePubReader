@@ -115,6 +115,10 @@ String renderWizMini(String folder, int8_t scrollDelta) {
             break;
           }
         }
+        // Skip MacOS metadata files (they are dumb)
+        if (entryName.startsWith("._")) {
+          skip = true;
+        }
         if (skip) {
           entry.close();
           continue;
