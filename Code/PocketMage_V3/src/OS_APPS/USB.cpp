@@ -127,9 +127,12 @@ void USB_INIT() {
   ESP_LOGI(TAG, "Unmounting SD_MMC for USB MSC...");
 
   SD_MMC.end();  // unmount FS before raw access
+  delay(200);    // Give the card hardware a moment to settle state
 
   // Configure SDMMC host and slot manually
   sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+  host.max_freq_khz = SDMMC_FREQ_DEFAULT; // Force 20MHz for stability
+  
   sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
   slot_config.clk = (gpio_num_t)SD_CLK;
   slot_config.cmd = (gpio_num_t)SD_CMD;
@@ -138,6 +141,9 @@ void USB_INIT() {
   slot_config.d2 = (gpio_num_t)0;
   slot_config.d3 = (gpio_num_t)0;
   slot_config.width = 1;  // or 4 for 4-bit mode
+  
+  // CRITICAL FIX: Force internal pull-ups to prevent ESP_ERR_TIMEOUT
+  slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
   // Initialize host
   esp_err_t err = sdmmc_host_init();
