@@ -169,49 +169,56 @@ void processKB_TASKS() {
   OLED().setPowerSave(false);
   int currentMillis = millis();
   disableTimeout = false;
-  char inchar;
-
+  char inchar = 0;
   String input = "";
 
   switch (CurrentTasksState) {
     case TASKS0:
       KB().setKeyboardState(FUNC);
-      if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-        inchar = KB().updateKeypress();
-        //No char recieved
-        if (inchar == 0);
-        //BKSP Recieved
-        else if (inchar == 127 || inchar == 8 || inchar == 12) {
-          HOME_INIT();
-          break;
-        }
-        // NEW TASK
-        else if (inchar == '/' || inchar == 'n' || inchar == 'N') {
-          CurrentTasksState = TASKS0_NEWTASK;
-          KB().setKeyboardState(NORMAL);
-          newTaskState = 0;
-          break;
-        }
-        // SELECT A TASK
-        else if (inchar >= '0' && inchar <= '9') {
-          int taskIndex = (inchar == '0') ? 9 : (inchar - '1');  
+      
+      // 1. Drain the hardware buffer continuously at loop speed
+      inchar = KB().updateKeypress();
 
-          // SET SELECTED TASK
-          if (taskIndex < tasks.size()) {
-            selectedTask = taskIndex;
-            // GO TO TASKS1
-            CurrentTasksState = TASKS1;
-            editTaskState = 0;
-            newState = true;
+      // 2. Only process the actual input if the cooldown has expired
+      if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
+        if (inchar != 0) {
+          KBBounceMillis = currentMillis;
+
+          //BKSP Recieved
+          if (inchar == 127 || inchar == 8 || inchar == 12) {
+            HOME_INIT();
+            break;
+          }
+          // NEW TASK
+          else if (inchar == '/' || inchar == 'n' || inchar == 'N') {
+            CurrentTasksState = TASKS0_NEWTASK;
+            KB().setKeyboardState(NORMAL);
+            newTaskState = 0;
+            break;
+          }
+          // SELECT A TASK
+          else if (inchar >= '0' && inchar <= '9') {
+            int taskIndex = (inchar == '0') ? 9 : (inchar - '1');  
+
+            // SET SELECTED TASK
+            if (taskIndex < tasks.size()) {
+              selectedTask = taskIndex;
+              // GO TO TASKS1
+              CurrentTasksState = TASKS1;
+              editTaskState = 0;
+              newState = true;
+            }
           }
         }
+      }
 
-        currentMillis = millis();
-        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
-          OLEDFPSMillis = currentMillis;
+      // 3. Update OLED at true OLED_MAX_FPS, completely independent of keyboard bounce
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        if (CurrentTasksState == TASKS0) { // Make sure we didn't just jump to another menu
           OLED().oledWord(currentWord);
         }
-        KBBounceMillis = currentMillis;
       }
       break;
 
@@ -230,14 +237,16 @@ void processKB_TASKS() {
       } 
       else if (newTaskState == 1) {
         // Step 2: Interactive Date Prompt
-        String uiDate = datePrompt(); // Returns "DD/MM/YYYY"
+        String uiDate = datePrompt(""); // Returns "DD/MM/YYYY"
 
         // Convert "DD/MM/YYYY" to internal "YYYYMMDD" format for sorting
-        newTaskDueDate = uiDate.substring(6, 10) + uiDate.substring(3, 5) + uiDate.substring(0, 2);
+        if (uiDate.length() == 10) {
+            newTaskDueDate = uiDate.substring(6, 10) + uiDate.substring(3, 5) + uiDate.substring(0, 2);
 
-        // ADD NEW TASK
-        addTask(newTaskName, newTaskDueDate, "0", "0");
-        OLED().sysMessage("New Task Added",1000);
+            // ADD NEW TASK
+            addTask(newTaskName, newTaskDueDate, "0", "0");
+            OLED().sysMessage("New Task Added",1000);
+        }
 
         // RETURN TO MAIN MENU
         newTaskState = 0;
@@ -248,83 +257,91 @@ void processKB_TASKS() {
 
     case TASKS1:
       disableTimeout = false;
-
       KB().setKeyboardState(FUNC);
-      currentMillis = millis();
+
+      // 1. Drain the hardware buffer continuously at loop speed
+      inchar = KB().updateKeypress();
+      
+      // 2. Only process the actual input if the cooldown has expired
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-        char inchar = KB().updateKeypress();
+        if (inchar != 0) {
+          KBBounceMillis = currentMillis;
         
-        if (inchar == 0);
-        else if (inchar == 127 || inchar == 8 || inchar == 12) {
-          CurrentTasksState = TASKS0;
-          EINK().forceSlowFullUpdate(true);
-          newState = true;
-          break;
-        }
-        else if (inchar >= '1' && inchar <= '4') {
-            
-          if (selectedTask >= 0 && selectedTask < tasks.size()) {
-              if (inchar == '1') {      // RENAME TASK
-                KB().setKeyboardState(NORMAL);
-                input = textPrompt("Enter a new task name:");
-                if (input == "_RETURN_") return;
-                else if (input != "_EXIT_") {
-                  OLED().oledWord("updating task...");
-                  tasks[selectedTask][0] = input;
-                  updateTasksFile();
+          if (inchar == 127 || inchar == 8 || inchar == 12) {
+            CurrentTasksState = TASKS0;
+            EINK().forceSlowFullUpdate(true);
+            newState = true;
+            break;
+          }
+          else if (inchar >= '1' && inchar <= '4') {
+              
+            if (selectedTask >= 0 && selectedTask < tasks.size()) {
+                if (inchar == '1') {      // RENAME TASK
+                  KB().setKeyboardState(NORMAL);
+                  input = textPrompt("Enter a new task name:");
+                  if (input == "_RETURN_") return;
+                  else if (input != "_EXIT_") {
+                    OLED().oledWord("updating task...");
+                    tasks[selectedTask][0] = input;
+                    updateTasksFile();
+
+                    CurrentTasksState = TASKS0;
+                    EINK().forceSlowFullUpdate(true);
+                    newState = true;
+                  }
+                }
+                else if (inchar == '2') { // CHANGE DUE DATE
+                  // Call the new interactive UI
+                  String uiDate = datePrompt(tasks[selectedTask][1]);
+                  
+                  if (uiDate != "_EXIT_" && uiDate.length() == 10) {
+                    OLED().oledWord("updating task...");
+
+                    // Convert "DD/MM/YYYY" to internal "YYYYMMDD"
+                    newTaskDueDate = uiDate.substring(6, 10) + uiDate.substring(3, 5) + uiDate.substring(0, 2);
+
+                    // UPDATE DUE DATE
+                    tasks[selectedTask][1] = newTaskDueDate;
+                    updateTasksFile();
+
+                    // RETURN
+                    CurrentTasksState = TASKS0;
+                    EINK().forceSlowFullUpdate(true);
+                    newState = true;
+                  }
+                }
+                else if (inchar == '3') { // DELETE TASK
+                  int response = boolPrompt("Delete Task?");
+                  if (response == 1) {
+                    OLED().oledWord("deleting...");
+                    deleteTask(selectedTask);
+                    updateTasksFile();
+
+                    CurrentTasksState = TASKS0;
+                    EINK().forceSlowFullUpdate(true);
+                    newState = true;
+                  }
+                }
+                else if (inchar == '4') { // COPY TASK
+                  OLED().oledWord("copying...");
+                  addTask(tasks[selectedTask][0]+"_COPY", tasks[selectedTask][1], "0", "0");
 
                   CurrentTasksState = TASKS0;
                   EINK().forceSlowFullUpdate(true);
                   newState = true;
                 }
-              }
-              else if (inchar == '2') { // CHANGE DUE DATE
-                // Call the new interactive UI
-                String uiDate = datePrompt(tasks[selectedTask][1]);
-                
-                OLED().oledWord("updating task...");
-
-                // Convert "DD/MM/YYYY" to internal "YYYYMMDD"
-                newTaskDueDate = uiDate.substring(6, 10) + uiDate.substring(3, 5) + uiDate.substring(0, 2);
-
-                // UPDATE DUE DATE
-                tasks[selectedTask][1] = newTaskDueDate;
-                updateTasksFile();
-
-                // RETURN
-                CurrentTasksState = TASKS0;
-                EINK().forceSlowFullUpdate(true);
-                newState = true;
-              }
-              else if (inchar == '3') { // DELETE TASK
-                int response = boolPrompt("Delete Task?");
-                if (response == 1) {
-                  OLED().oledWord("deleting...");
-                  deleteTask(selectedTask);
-                  updateTasksFile();
-
-                  CurrentTasksState = TASKS0;
-                  EINK().forceSlowFullUpdate(true);
-                  newState = true;
-                }
-              }
-              else if (inchar == '4') { // COPY TASK
-                OLED().oledWord("copying...");
-                addTask(tasks[selectedTask][0]+"_COPY", tasks[selectedTask][1], "0", "0");
-
-                CurrentTasksState = TASKS0;
-                EINK().forceSlowFullUpdate(true);
-                newState = true;
-              }
+            }
           }
         }
+      }
 
-        currentMillis = millis();
-        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
-          OLEDFPSMillis = currentMillis;
+      // 3. Update OLED at true OLED_MAX_FPS, completely independent of keyboard bounce
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        if (CurrentTasksState == TASKS1) { // Make sure we didn't just jump to another menu
           OLED().oledWord(currentWord);
         }
-        KBBounceMillis = currentMillis;
       }
       break;
   }

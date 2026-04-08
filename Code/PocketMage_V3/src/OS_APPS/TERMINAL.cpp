@@ -1179,6 +1179,7 @@ void processKB_TERMINAL() {
 
   // Potion
   static int cursor_pos = 0;
+  int currentMillis = millis();
 
   switch (CurrentTERMfunc) {
     case PROMPT:
@@ -1190,190 +1191,196 @@ void processKB_TERMINAL() {
       } else
         HOME_INIT();
       break;
+
     case POTION:
-      int currentMillis = millis();
       String left = "";
       String right = "";
 
-      // update scroll
+      // 1. Drain the hardware buffer continuously at loop speed
+      pocketmage::setCpuSpeed(240);
+      char inchar = KB().updateKeypress();
+      if (inchar == 0) pocketmage::setCpuSpeed(POWER_SAVE_FREQ);
+
+      // update scroll (Independent of keyboard debounce)
       if (TOUCH().updateScroll(potionLines.size() - 1, currentPotionLine)) {
         // Put cursor at the end
         cursor_pos = potionLines[currentPotionLine].length();
         newState = true;
       }
 
+      // 2. Only process the actual input if the cooldown has expired
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
-        pocketmage::setCpuSpeed(240);
-        char inchar = KB().updateKeypress();
-        if (inchar != 0)
+        if (inchar != 0) {
           lastInput = millis();
+          KBBounceMillis = currentMillis;
 
-        // HANDLE INPUTS
-        // No char recieved
-        if (inchar == 0)
-          pocketmage::setCpuSpeed(POWER_SAVE_FREQ);
-        // CR Recieved
-        else if (inchar == 13) {
-          // Add a line and go to it
-          if (cursor_pos == 0 && potionLines[currentPotionLine].length() > 0) {
-            potionLines.insert(potionLines.begin() + currentPotionLine, "");
-          }
-          else {
-            potionLines.insert(potionLines.begin() + currentPotionLine + 1, "");
-            currentPotionLine++;
-          }
-          KB().setKeyboardState(NORMAL);
-          cursor_pos = 0;
-          newState = true;
-          break;
-        }
-        // SHIFT Recieved
-        else if (inchar == 17) {
-          if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) {
+          // HANDLE INPUTS
+          // CR Recieved
+          if (inchar == 13) {
+            // Add a line and go to it
+            if (cursor_pos == 0 && potionLines[currentPotionLine].length() > 0) {
+              potionLines.insert(potionLines.begin() + currentPotionLine, "");
+            }
+            else {
+              potionLines.insert(potionLines.begin() + currentPotionLine + 1, "");
+              currentPotionLine++;
+            }
             KB().setKeyboardState(NORMAL);
-          } else if (KB().getKeyboardState() == FUNC) {
-            KB().setKeyboardState(FN_SHIFT);
-          } else {
-            KB().setKeyboardState(SHIFT);
+            cursor_pos = 0;
+            newState = true;
+            break;
           }
-        }
-        // FN Recieved
-        else if (inchar == 18) {
-          if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) {
-            KB().setKeyboardState(NORMAL);
-          } else if (KB().getKeyboardState() == SHIFT) {
-            KB().setKeyboardState(FN_SHIFT);
-          } else {
-            KB().setKeyboardState(FUNC);
+          // SHIFT Recieved
+          else if (inchar == 17) {
+            if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) {
+              KB().setKeyboardState(NORMAL);
+            } else if (KB().getKeyboardState() == FUNC) {
+              KB().setKeyboardState(FN_SHIFT);
+            } else {
+              KB().setKeyboardState(SHIFT);
+            }
           }
-        }
-        // BKSP Recieved
-        else if (inchar == 8) {
-          if (potionLines[currentPotionLine].length() > 0 && cursor_pos != 0) {
-            uint16_t old_cursor = cursor_pos;
-            // Safely leap over UTF-8 continuation bytes
-            do { cursor_pos--; } while (cursor_pos > 0 && (potionLines[currentPotionLine][cursor_pos] & 0xC0) == 0x80);
-            
-            int bytesToDelete = old_cursor - cursor_pos;
-            potionLines[currentPotionLine].remove(cursor_pos, bytesToDelete);
+          // FN Recieved
+          else if (inchar == 18) {
+            if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) {
+              KB().setKeyboardState(NORMAL);
+            } else if (KB().getKeyboardState() == SHIFT) {
+              KB().setKeyboardState(FN_SHIFT);
+            } else {
+              KB().setKeyboardState(FUNC);
+            }
           }
-          else if (potionLines[currentPotionLine].length() == 0) {
-            if (potionLines.size() > 1) {
-              potionLines.erase(potionLines.begin() + currentPotionLine);
+          // BKSP Recieved
+          else if (inchar == 8) {
+            if (potionLines[currentPotionLine].length() > 0 && cursor_pos != 0) {
+              uint16_t old_cursor = cursor_pos;
+              // Safely leap over UTF-8 continuation bytes
+              do { cursor_pos--; } while (cursor_pos > 0 && (potionLines[currentPotionLine][cursor_pos] & 0xC0) == 0x80);
               
-              // If the deleted line was the last line, shift the active index up
-              if (currentPotionLine >= potionLines.size()) {
-                currentPotionLine--;
+              int bytesToDelete = old_cursor - cursor_pos;
+              potionLines[currentPotionLine].remove(cursor_pos, bytesToDelete);
+            }
+            else if (potionLines[currentPotionLine].length() == 0) {
+              if (potionLines.size() > 1) {
+                potionLines.erase(potionLines.begin() + currentPotionLine);
+                
+                // If the deleted line was the last line, shift the active index up
+                if (currentPotionLine >= potionLines.size()) {
+                  currentPotionLine--;
+                }
+                // Safely clamp cursor
+                cursor_pos = potionLines[currentPotionLine].length(); 
+                newState = true;
               }
-              // Safely clamp cursor
-              cursor_pos = potionLines[currentPotionLine].length(); 
+            }
+          }
+          // LEFT
+          else if (inchar == 19) {
+            if (cursor_pos > 0) {
+              do { cursor_pos--; } while (cursor_pos > 0 && (potionLines[currentPotionLine][cursor_pos] & 0xC0) == 0x80);
+            }
+          }
+          // RIGHT
+          else if (inchar == 21) {
+            if (cursor_pos < potionLines[currentPotionLine].length()) {
+              do { cursor_pos++; } while (cursor_pos < potionLines[currentPotionLine].length() && (potionLines[currentPotionLine][cursor_pos] & 0xC0) == 0x80);
+            }
+          }
+          // CENTER
+          else if (inchar == 20) {
+            KB().setKeyboardState(FUNC);
+            command = textPrompt("GOTO LINE:");
+            if (command == "_RETURN_") return;
+            else if (command != "_EXIT_") {
+              int line = atoi(command.c_str());
+              // Line is in bounds
+              if (line >= 0 && line < potionLines.size()) {
+                currentPotionLine = line;
+              }
+              else if (line < 0) currentPotionLine = 0;
+              else if (line >= potionLines.size()) currentPotionLine = potionLines.size() - 1;
+              
+              cursor_pos = potionLines[currentPotionLine].length();
               newState = true;
             }
-          }
-        }
-        // LEFT
-        else if (inchar == 19) {
-          if (cursor_pos > 0) {
-            do { cursor_pos--; } while (cursor_pos > 0 && (potionLines[currentPotionLine][cursor_pos] & 0xC0) == 0x80);
-          }
-        }
-        // RIGHT
-        else if (inchar == 21) {
-          if (cursor_pos < potionLines[currentPotionLine].length()) {
-            do { cursor_pos++; } while (cursor_pos < potionLines[currentPotionLine].length() && (potionLines[currentPotionLine][cursor_pos] & 0xC0) == 0x80);
-          }
-        }
-        // CENTER
-        else if (inchar == 20) {
-          KB().setKeyboardState(FUNC);
-          command = textPrompt("GOTO LINE:");
-          if (command == "_RETURN_") return;
-          else if (command != "_EXIT_") {
-            int line = atoi(command.c_str());
-            // Line is in bounds
-            if (line >= 0 && line < potionLines.size()) {
-              currentPotionLine = line;
-            }
-            else if (line < 0) currentPotionLine = 0;
-            else if (line >= potionLines.size()) currentPotionLine = potionLines.size() - 1;
-            
-            cursor_pos = potionLines[currentPotionLine].length();
-            newState = true;
-          }
-          KB().setKeyboardState(NORMAL);
-        }
-        // SHIFT+LEFT
-        else if (inchar == 28) {
-          cursor_pos = 0;
-          KB().setKeyboardState(NORMAL);
-        }
-        // SHIFT+RIGHT
-        else if (inchar == 30) {
-          cursor_pos = potionLines[currentPotionLine].length();
-          KB().setKeyboardState(NORMAL);
-        }
-        // SHIFT+CENTER
-        else if (inchar == 29) {
-          KB().setKeyboardState(NORMAL);
-        }
-        // FN+LEFT
-        else if (inchar == 12) {
-          TERMINAL_INIT();
-          break;
-        }
-        // FN+RIGHT
-        else if (inchar == 6) {
-          if (editFile != "")
-            savePotionFile(editFile);
-            newState = true;
-          break;
-        }
-        // FN+CENTER
-        else if (inchar == 7) {
-          potionLines[currentPotionLine] = "";
-          cursor_pos = 0;
-          KB().setKeyboardState(NORMAL);
-        }
-        // FN+SHIFT+LEFT
-        else if (inchar == 24) {
-          KB().setKeyboardState(NORMAL);
-        }
-        // FN+SHIFT+RIGHT
-        else if (inchar == 26) {
-          KB().setKeyboardState(NORMAL);
-        }
-        // FN+SHIFT+CENTER
-        else if (inchar == 25) {
-          KB().setKeyboardState(NORMAL);
-        }
-        // TAB, SHIFT+TAB / FN+TAB, FN+SHIFT+TAB
-        else if (inchar == 9 || inchar == 14) {
-          potionLines[currentPotionLine] = "  " + potionLines[currentPotionLine];
-          cursor_pos += 2;
-        } 
-        else {
-          // split line at cursor_pos
-          if (cursor_pos == 0) {
-            potionLines[currentPotionLine] = inchar + potionLines[currentPotionLine];
-          } else if (cursor_pos == potionLines[currentPotionLine].length()) {
-            potionLines[currentPotionLine] += inchar;
-          } else {
-            left = potionLines[currentPotionLine].substring(0, cursor_pos);
-            right = potionLines[currentPotionLine].substring(cursor_pos);
-            potionLines[currentPotionLine] = left + inchar + right;
-          }
-          cursor_pos++;
-          if (inchar >= 48 && inchar <= 57) {
-          }  // Only leave FN on if typing numbers
-          else if (KB().getKeyboardState() != NORMAL) {
             KB().setKeyboardState(NORMAL);
           }
+          // SHIFT+LEFT
+          else if (inchar == 28) {
+            cursor_pos = 0;
+            KB().setKeyboardState(NORMAL);
+          }
+          // SHIFT+RIGHT
+          else if (inchar == 30) {
+            cursor_pos = potionLines[currentPotionLine].length();
+            KB().setKeyboardState(NORMAL);
+          }
+          // SHIFT+CENTER
+          else if (inchar == 29) {
+            KB().setKeyboardState(NORMAL);
+          }
+          // FN+LEFT
+          else if (inchar == 12) {
+            TERMINAL_INIT();
+            break;
+          }
+          // FN+RIGHT
+          else if (inchar == 6) {
+            if (editFile != "")
+              savePotionFile(editFile);
+              newState = true;
+            break;
+          }
+          // FN+CENTER
+          else if (inchar == 7) {
+            potionLines[currentPotionLine] = "";
+            cursor_pos = 0;
+            KB().setKeyboardState(NORMAL);
+          }
+          // FN+SHIFT+LEFT
+          else if (inchar == 24) {
+            KB().setKeyboardState(NORMAL);
+          }
+          // FN+SHIFT+RIGHT
+          else if (inchar == 26) {
+            KB().setKeyboardState(NORMAL);
+          }
+          // FN+SHIFT+CENTER
+          else if (inchar == 25) {
+            KB().setKeyboardState(NORMAL);
+          }
+          // TAB, SHIFT+TAB / FN+TAB, FN+SHIFT+TAB
+          else if (inchar == 9 || inchar == 14) {
+            potionLines[currentPotionLine] = "  " + potionLines[currentPotionLine];
+            cursor_pos += 2;
+          } 
+          else {
+            // split line at cursor_pos
+            if (cursor_pos == 0) {
+              potionLines[currentPotionLine] = inchar + potionLines[currentPotionLine];
+            } else if (cursor_pos == potionLines[currentPotionLine].length()) {
+              potionLines[currentPotionLine] += inchar;
+            } else {
+              left = potionLines[currentPotionLine].substring(0, cursor_pos);
+              right = potionLines[currentPotionLine].substring(cursor_pos);
+              potionLines[currentPotionLine] = left + inchar + right;
+            }
+            cursor_pos++;
+            if (inchar >= 48 && inchar <= 57) {
+            }  // Only leave FN on if typing numbers
+            else if (KB().getKeyboardState() != NORMAL) {
+              KB().setKeyboardState(NORMAL);
+            }
+          }
         }
+      }
 
-        currentMillis = millis();
-        // Make sure oled only updates at OLED_MAX_FPS
-        if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
-          OLEDFPSMillis = currentMillis;
+      // 3. Update OLED at true OLED_MAX_FPS, completely independent of keyboard bounce
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        
+        if (CurrentTERMfunc == POTION) { // Verify we didn't just exit back to PROMPT
           if (TOUCH().getLastTouch() == -1) {
             String lineNum = String(currentPotionLine);
             while (lineNum.length() < 3) {

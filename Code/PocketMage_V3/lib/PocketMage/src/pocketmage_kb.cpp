@@ -1052,6 +1052,13 @@ char PocketmageKB::updateKeypress() {
     }
   }
 
+  // --- LEVEL-TRIGGER FAILSAFE ---
+  // If the physical interrupt pin is STILL held low by the TCA8418 after we processed everything,
+  // we missed a falling edge during the I2C transaction. Force the software flag to stay true.
+  if (digitalRead(KB_IRQ) == LOW) {
+      TCA8418_event_ = true;
+  }
+
   return 0;
 }
 

@@ -667,103 +667,102 @@ void APPLOADER_INIT() {
 void processKB_APPLOADER() {
   int currentMillis = millis();
   String outPath = "";
+  char inchar = 0;
 
   switch (CurrentAppLoaderState) {
     case MENU:
-      if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-        char inchar = KB().updateKeypress();
-        
-        if (inchar != 0) {
-            KBBounceMillis = currentMillis;
-        }
+      // 1. Drain the hardware buffer continuously at loop speed
+      inchar = KB().updateKeypress();
 
-        // HANDLE INPUTS
-        if (inchar == 0) {
-            // Do nothing
-        }
-        else if (inchar == 12 || inchar == 23) { // Home or App Switcher Kill Signal
+      // 2. Only process the actual input if the cooldown has expired
+      if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
+        if (inchar != 0) {
+          KBBounceMillis = currentMillis;
+
+          // HANDLE INPUTS
+          if (inchar == 12 || inchar == 23) { // Home or App Switcher Kill Signal
             HOME_INIT();
-        }
-        else if (inchar == 'a' || inchar == 'A' || inchar == '1') {
+          }
+          else if (inchar == 'a' || inchar == 'A' || inchar == '1') {
             selectedSlot = 1;
             CurrentAppLoaderState = SWAP_OR_EDIT;
             KB().setKeyboardState(NORMAL);
-        }
-        else if (inchar == 'b' || inchar == 'B' || inchar == '2') {
+          }
+          else if (inchar == 'b' || inchar == 'B' || inchar == '2') {
             selectedSlot = 2;
             CurrentAppLoaderState = SWAP_OR_EDIT;
             KB().setKeyboardState(NORMAL);
-        }
-        else if (inchar == 'c' || inchar == 'C' || inchar == '3') {
+          }
+          else if (inchar == 'c' || inchar == 'C' || inchar == '3') {
             selectedSlot = 3;
             CurrentAppLoaderState = SWAP_OR_EDIT;
             KB().setKeyboardState(NORMAL);
-        }
-        else if (inchar == 'd' || inchar == 'D' || inchar == '4') {
+          }
+          else if (inchar == 'd' || inchar == 'D' || inchar == '4') {
             selectedSlot = 4;
             CurrentAppLoaderState = SWAP_OR_EDIT;
             KB().setKeyboardState(NORMAL);
+          }
+          // All other keys are ignored in the MENU state
         }
-        // All other keys are ignored in the MENU state
+      }
 
-        currentMillis = millis();
-        // Make sure oled only updates at OLED_MAX_FPS
-        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
-          OLEDFPSMillis = currentMillis;
-          OLED().oledWord("Choose slot: (A)(B)(C)(D)");
-        }
+      // 3. Update OLED at true OLED_MAX_FPS, completely independent of keyboard bounce
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        OLED().oledWord("Choose slot: (A)(B)(C)(D)");
       }
       break;
 
     case SWAP_OR_EDIT:
+      // 1. Drain the hardware buffer continuously at loop speed
+      inchar = KB().updateKeypress();
+
+      // 2. Only process the actual input if the cooldown has expired
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-        char inchar = KB().updateKeypress();
-
         if (inchar != 0) {
-            KBBounceMillis = currentMillis;
-        }
+          KBBounceMillis = currentMillis;
 
-        if (inchar == 0) {
-            // Do nothing
-        }   
-        else if (inchar == 12 || inchar == 23) { // Home or App Switcher Kill Signal
-          selectedSlot = 0;
-          CurrentAppLoaderState = MENU;
-          newState = true; // Trigger e-ink redraw of the menu
-        }
-        else if (inchar == 'S' || inchar == 's' || inchar == '!') {
-          CurrentAppLoaderState = SWAP;
-        }
-        else if (inchar == 'D' || inchar == 'd' || inchar == '$') {
-          // Clear the slot
-          prefs.begin("PocketMage", false);
-          prefs.remove(("OTA" + String(selectedSlot)).c_str());
-          prefs.end();
-
-          const esp_partition_t *partition =
-            esp_partition_find_first(ESP_PARTITION_TYPE_APP,
-            (esp_partition_subtype_t)(ESP_PARTITION_SUBTYPE_APP_OTA_MIN + selectedSlot),
-            nullptr);
-
-          if (partition) {
-            esp_err_t err = esp_partition_erase_range(partition, 0, partition->size);
-            if (err == ESP_OK) {
-              Serial.printf("OTA_%d erased\n", selectedSlot);
-            }
+          if (inchar == 12 || inchar == 23) { // Home or App Switcher Kill Signal
+            selectedSlot = 0;
+            CurrentAppLoaderState = MENU;
+            newState = true; // Trigger e-ink redraw of the menu
           }
+          else if (inchar == 'S' || inchar == 's' || inchar == '!') {
+            CurrentAppLoaderState = SWAP;
+          }
+          else if (inchar == 'D' || inchar == 'd' || inchar == '$') {
+            // Clear the slot
+            prefs.begin("PocketMage", false);
+            prefs.remove(("OTA" + String(selectedSlot)).c_str());
+            prefs.end();
 
-          OLED().sysMessage("App removed", 2000);
+            const esp_partition_t *partition =
+              esp_partition_find_first(ESP_PARTITION_TYPE_APP,
+              (esp_partition_subtype_t)(ESP_PARTITION_SUBTYPE_APP_OTA_MIN + selectedSlot),
+              nullptr);
 
-          newState = true;
-          CurrentAppLoaderState = MENU;
+            if (partition) {
+              esp_err_t err = esp_partition_erase_range(partition, 0, partition->size);
+              if (err == ESP_OK) {
+                Serial.printf("OTA_%d erased\n", selectedSlot);
+              }
+            }
+
+            OLED().sysMessage("App removed", 2000);
+
+            newState = true;
+            CurrentAppLoaderState = MENU;
+          }
         }
+      }
         
-        currentMillis = millis();
-        // Make sure oled only updates at OLED_MAX_FPS
-        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
-          OLEDFPSMillis = currentMillis;
-          OLED().oledWord("(S)wap app or (D)elete app");
-        }
+      // 3. Update OLED at true OLED_MAX_FPS, completely independent of keyboard bounce
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        OLED().oledWord("(S)wap app or (D)elete app");
       }
       break;
 

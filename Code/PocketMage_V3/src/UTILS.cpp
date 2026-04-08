@@ -322,143 +322,142 @@ String textPrompt(String promptText, String prefix) {
         redraw = true;
     }
 
-    if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
-      char inchar = KB().updateKeypress();
+    char inchar = KB().updateKeypress();
 
+    if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
       if (inchar != 0) {
         lastInput = millis();
         KBBounceMillis = currentMillis; 
         redraw = true;
-      }
 
-      // HANDLE INPUTS
-      if (inchar == 0) ;
-      else if (inchar == 23) {
-        currentLine = "_RETURN_";
-        break;
-      }
-      else if (inchar == 13) {
-        cursor_pos = 0;
-        break;
-      }
-      else if (inchar == 17) {
-        if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) {
-          KB().setKeyboardState(NORMAL);
-        } else if (KB().getKeyboardState() == FUNC) {
-          KB().setKeyboardState(FN_SHIFT);
-        } else {
-          KB().setKeyboardState(SHIFT);
+        // HANDLE INPUTS
+        if (inchar == 23) {
+          currentLine = "_RETURN_";
+          break;
         }
-      }
-      else if (inchar == 18) {
-        if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) {
-          KB().setKeyboardState(NORMAL);
-        } else if (KB().getKeyboardState() == SHIFT) {
-          KB().setKeyboardState(FN_SHIFT);
-        } else {
-          KB().setKeyboardState(FUNC);
+        else if (inchar == 13) {
+          cursor_pos = 0;
+          break;
         }
-      }
-      else if (inchar == 8) {
-        if (currentLine.length() > 0 && cursor_pos != 0) {
-          int old_cursor = cursor_pos;
-          do { cursor_pos--; } while (cursor_pos > 0 && (currentLine[cursor_pos] & 0xC0) == 0x80);
-          int bytesToDelete = old_cursor - cursor_pos;
-          currentLine.remove(cursor_pos, bytesToDelete);
+        else if (inchar == 17) {
+          if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) {
+            KB().setKeyboardState(NORMAL);
+          } else if (KB().getKeyboardState() == FUNC) {
+            KB().setKeyboardState(FN_SHIFT);
+          } else {
+            KB().setKeyboardState(SHIFT);
+          }
         }
-      }
-      else if (inchar == 19) {
-        if (cursor_pos > 0) {
-          do { cursor_pos--; } while (cursor_pos > 0 && (currentLine[cursor_pos] & 0xC0) == 0x80);
+        else if (inchar == 18) {
+          if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) {
+            KB().setKeyboardState(NORMAL);
+          } else if (KB().getKeyboardState() == SHIFT) {
+            KB().setKeyboardState(FN_SHIFT);
+          } else {
+            KB().setKeyboardState(FUNC);
+          }
         }
-      }
-      else if (inchar == 21) {
-        if (cursor_pos < currentLine.length()) {
-          do { cursor_pos++; } while (cursor_pos < currentLine.length() && (currentLine[cursor_pos] & 0xC0) == 0x80);
+        else if (inchar == 8) {
+          if (currentLine.length() > 0 && cursor_pos != 0) {
+            int old_cursor = cursor_pos;
+            do { cursor_pos--; } while (cursor_pos > 0 && (currentLine[cursor_pos] & 0xC0) == 0x80);
+            int bytesToDelete = old_cursor - cursor_pos;
+            currentLine.remove(cursor_pos, bytesToDelete);
+          }
         }
-      }
-      else if (inchar == 20) {
-      }
-      else if (inchar == 28) {
-        cursor_pos = 0;
-        KB().setKeyboardState(NORMAL);
-      }
-      else if (inchar == 30) {
-        cursor_pos = currentLine.length();
-        KB().setKeyboardState(NORMAL);
-      }
-      else if (inchar == 29) {
-        KB().setKeyboardState(NORMAL);
-      }
-      else if (inchar == 12) {
-        currentLine = "_EXIT_";
-        break;
-      }
-      else if (inchar == 6) {
-        KB().setKeyboardState(NORMAL);
-      }
-      else if (inchar == 7) {
-        currentLine = "";
-        cursor_pos = 0;
-        KB().setKeyboardState(NORMAL);
-      }
-      else if (inchar == 24) {
-        KB().setKeyboardState(NORMAL);
-      }
-      else if (inchar == 26) {
-        KB().setKeyboardState(NORMAL);
-      }
-      else if (inchar == 25) {
-        KB().setKeyboardState(NORMAL);
-      }
-      else if (inchar == 9 || inchar == 14) {
-        KB().setKeyboardState(NORMAL);
-      } else {
-        if (cursor_pos == 0) {
-          currentLine = inchar + currentLine;
-        } else if (cursor_pos == currentLine.length()) {
-          currentLine += inchar;
-        } else {
-          left = currentLine.substring(0, cursor_pos);
-          right = currentLine.substring(cursor_pos);
-          currentLine = left + inchar + right;
+        else if (inchar == 19) {
+          if (cursor_pos > 0) {
+            do { cursor_pos--; } while (cursor_pos > 0 && (currentLine[cursor_pos] & 0xC0) == 0x80);
+          }
         }
-        cursor_pos++;
-        if (inchar >= 48 && inchar <= 57) {
-        } 
-        else if (KB().getKeyboardState() != NORMAL) {
+        else if (inchar == 21) {
+          if (cursor_pos < currentLine.length()) {
+            do { cursor_pos++; } while (cursor_pos < currentLine.length() && (currentLine[cursor_pos] & 0xC0) == 0x80);
+          }
+        }
+        else if (inchar == 20) {
+        }
+        else if (inchar == 28) {
+          cursor_pos = 0;
           KB().setKeyboardState(NORMAL);
         }
-      }
-
-      // Handle idle state transitions
-      bool isIdle = (millis() - lastInput > IDLE_TIME);
-      static bool wasIdle = false;
-      
-      // If we just woke up from being idle, reset the mage and force a text redraw
-      if (isIdle != wasIdle) {
-         wasIdle = isIdle;
-         if (!isIdle) {
-             resetIdle();
-             redraw = true; 
-         }
-      }
-
-      // Display Update Loop (Runs at OLED_MAX_FPS)
-      if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
-        if (isIdle) {
-          // Continuously update the idle animation frames while idle
-          OLEDFPSMillis = currentMillis;
-          mageIdle(true); 
-        } 
-        else if (redraw) {
-          // Only redraw the text prompt if the user typed or moved the cursor
-          OLEDFPSMillis = currentMillis;
-          redraw = false;
-          
-          if (prefix != "") OLED().oledLine(prefix + currentLine, cursor_pos+prefix.length(), false, promptText);
-          else OLED().oledLine(currentLine, cursor_pos, false, promptText);
+        else if (inchar == 30) {
+          cursor_pos = currentLine.length();
+          KB().setKeyboardState(NORMAL);
         }
+        else if (inchar == 29) {
+          KB().setKeyboardState(NORMAL);
+        }
+        else if (inchar == 12) {
+          currentLine = "_EXIT_";
+          break;
+        }
+        else if (inchar == 6) {
+          KB().setKeyboardState(NORMAL);
+        }
+        else if (inchar == 7) {
+          currentLine = "";
+          cursor_pos = 0;
+          KB().setKeyboardState(NORMAL);
+        }
+        else if (inchar == 24) {
+          KB().setKeyboardState(NORMAL);
+        }
+        else if (inchar == 26) {
+          KB().setKeyboardState(NORMAL);
+        }
+        else if (inchar == 25) {
+          KB().setKeyboardState(NORMAL);
+        }
+        else if (inchar == 9 || inchar == 14) {
+          KB().setKeyboardState(NORMAL);
+        } else {
+          if (cursor_pos == 0) {
+            currentLine = inchar + currentLine;
+          } else if (cursor_pos == currentLine.length()) {
+            currentLine += inchar;
+          } else {
+            left = currentLine.substring(0, cursor_pos);
+            right = currentLine.substring(cursor_pos);
+            currentLine = left + inchar + right;
+          }
+          cursor_pos++;
+          if (inchar >= 48 && inchar <= 57) {
+          } 
+          else if (KB().getKeyboardState() != NORMAL) {
+            KB().setKeyboardState(NORMAL);
+          }
+        }
+      }
+    }
+
+    // Handle idle state transitions
+    bool isIdle = (millis() - lastInput > IDLE_TIME);
+    static bool wasIdle = false;
+    
+    // If we just woke up from being idle, reset the mage and force a text redraw
+    if (isIdle != wasIdle) {
+       wasIdle = isIdle;
+       if (!isIdle) {
+           resetIdle();
+           redraw = true; 
+       }
+    }
+
+    // Display Update Loop (Runs at OLED_MAX_FPS)
+    if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
+      if (isIdle) {
+        // Continuously update the idle animation frames while idle
+        OLEDFPSMillis = currentMillis;
+        mageIdle(true); 
+      } 
+      else if (redraw) {
+        // Only redraw the text prompt if the user typed or moved the cursor
+        OLEDFPSMillis = currentMillis;
+        redraw = false;
+        
+        if (prefix != "") OLED().oledLine(prefix + currentLine, cursor_pos+prefix.length(), false, promptText);
+        else OLED().oledLine(currentLine, cursor_pos, false, promptText);
       }
     }
 
@@ -556,24 +555,24 @@ int boolPrompt(String promptText) {
     }
 
     int currentMillis = millis();
+    char inchar = KB().updateKeypress();
+
     if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
-      char inchar = KB().updateKeypress();
-
       if (inchar != 0) {
-          KBBounceMillis = currentMillis; 
-      }
-
-      if (inchar == 'y' || inchar == 'Y') {
-        retVal = 1;
-        break;
-      }
-      else if (inchar == 'n' || inchar == 'N') {
-        retVal = 0;
-        break;
-      }
-      else if (inchar == 23) { // App Switcher Kill Signal
-        retVal = 0; // Default to 'no' on cancel
-        break;
+        KBBounceMillis = currentMillis; 
+        
+        if (inchar == 'y' || inchar == 'Y') {
+          retVal = 1;
+          break;
+        }
+        else if (inchar == 'n' || inchar == 'N') {
+          retVal = 0;
+          break;
+        }
+        else if (inchar == 23) { // App Switcher Kill Signal
+          retVal = 0; // Default to 'no' on cancel
+          break;
+        }
       }
     }
 
@@ -667,73 +666,78 @@ int timePrompt(int defaultTime) {
 
     // Handle keyboard inputs
     KB().setKeyboardState(FUNC);
+    
+    int currentMillis = millis();
     char inchar = KB().updateKeypress();
 
-    // Left arrow or bksp
-    if (inchar == 12 || inchar == 8) {
-      if (currentIndex > 0) {
-        currentIndex--;
-      } 
-    }
+    if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
+      if (inchar != 0) {
+        KBBounceMillis = currentMillis;
 
-    // Right arrow
-    else if (inchar == 6) {
-      if (currentIndex < 3) {
-        currentIndex++;
-      }
-    }
-
-    // Direct Numeric Entry (0-9)
-    else if (inchar >= '0' && inchar <= '9') {
-      int val = inchar - '0'; // Convert ASCII char to integer
-      
-      switch (currentIndex) {
-        case 0: // Tens of Hours (Max 2)
-          digits[0] = (val > 2) ? 2 : val;
-          // Reverse Clamp: If we just set it to 2, ensure the hours digit isn't sitting at 4-9
-          if (digits[0] == 2 && digits[1] > 3) {
-             digits[1] = 3; 
+        // Left arrow or bksp
+        if (inchar == 12 || inchar == 8) {
+          if (currentIndex > 0) {
+            currentIndex--;
+          } 
+        }
+        // Right arrow
+        else if (inchar == 6) {
+          if (currentIndex < 3) {
+            currentIndex++;
           }
-          break;
+        }
+        // Direct Numeric Entry (0-9)
+        else if (inchar >= '0' && inchar <= '9') {
+          int val = inchar - '0'; // Convert ASCII char to integer
           
-        case 1: // Hours (Max 3 if Tens is 2, otherwise Max 9)
-          if (digits[0] == 2) {
-            digits[1] = (val > 3) ? 3 : val;
-          } else {
-            digits[1] = val;
+          switch (currentIndex) {
+            case 0: // Tens of Hours (Max 2)
+              digits[0] = (val > 2) ? 2 : val;
+              // Reverse Clamp: If we just set it to 2, ensure the hours digit isn't sitting at 4-9
+              if (digits[0] == 2 && digits[1] > 3) {
+                 digits[1] = 3; 
+              }
+              break;
+              
+            case 1: // Hours (Max 3 if Tens is 2, otherwise Max 9)
+              if (digits[0] == 2) {
+                digits[1] = (val > 3) ? 3 : val;
+              } else {
+                digits[1] = val;
+              }
+              break;
+              
+            case 2: // Tens of Minutes (Max 5)
+              digits[2] = (val > 5) ? 5 : val;
+              break;
+              
+            case 3: // Minutes (Max 9)
+              digits[3] = val;
+              break;
           }
-          break;
           
-        case 2: // Tens of Minutes (Max 5)
-          digits[2] = (val > 5) ? 5 : val;
-          break;
-          
-        case 3: // Minutes (Max 9)
-          digits[3] = val;
-          break;
-      }
-      
-      // Auto-advance cursor for natural typing flow
-      if (currentIndex < 3) {
-        currentIndex++;
-      }
-    }
+          // Auto-advance cursor for natural typing flow
+          if (currentIndex < 3) {
+            currentIndex++;
+          }
+        }
+        // Enter 
+        else if (inchar == 13) {
+          int returnInt = 0;
+          returnInt += digits[3]*1;
+          returnInt += digits[2]*10;
+          returnInt += digits[1]*100;
+          returnInt += digits[0]*1000;
 
-    // Enter 
-    else if (inchar == 13) {
-      int returnInt = 0;
-      returnInt += digits[3]*1;
-      returnInt += digits[2]*10;
-      returnInt += digits[1]*100;
-      returnInt += digits[0]*1000;
+          // Because of our modulo math and strict clamping, the digits can 
+          // physically never exceed 23:59. But we clamp just in case.
+          if (returnInt >= 2400) {
+              returnInt = 0;
+          }
 
-      // Because of our modulo math and strict clamping, the digits can 
-      // physically never exceed 23:59. But we clamp just in case.
-      if (returnInt >= 2400) {
-          returnInt = 0;
+          return returnInt;
+        }
       }
-
-      return returnInt;
     }
 
     // Draw interface
@@ -902,55 +906,63 @@ String datePrompt(String defaultYYYYMMDD) {
     KB().checkUSBKB();
 
     KB().setKeyboardState(FUNC);
+    
+    int currentMillis = millis();
     char inchar = KB().updateKeypress();
 
-    if (inchar == 9 || inchar == 14) {
-      DateTime now = CLOCK().nowDT();
-      char dateBuf[11];
-      snprintf(dateBuf, sizeof(dateBuf), "%02d/%02d/%04d", 
-               now.day(), now.month(), now.year());
-      return String(dateBuf);
-    }
-    else if (inchar == 12 || inchar == 8) {
-      if (currentIndex > 0) currentIndex--;
-    }
-    else if (inchar == 6) {
-      if (currentIndex < 7) currentIndex++;
-    }
-    else if (inchar >= '0' && inchar <= '9') {
-      int val = inchar - '0';
-      digits[currentIndex] = val;
+    if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
+      if (inchar != 0) {
+        KBBounceMillis = currentMillis;
 
-      int d = digits[0] * 10 + digits[1];
-      int m = digits[2] * 10 + digits[3];
-      int y = digits[4] * 1000 + digits[5] * 100 + digits[6] * 10 + digits[7];
+        if (inchar == 9 || inchar == 14) {
+          DateTime now = CLOCK().nowDT();
+          char dateBuf[11];
+          snprintf(dateBuf, sizeof(dateBuf), "%02d/%02d/%04d", 
+                   now.day(), now.month(), now.year());
+          return String(dateBuf);
+        }
+        else if (inchar == 12 || inchar == 8) {
+          if (currentIndex > 0) currentIndex--;
+        }
+        else if (inchar == 6) {
+          if (currentIndex < 7) currentIndex++;
+        }
+        else if (inchar >= '0' && inchar <= '9') {
+          int val = inchar - '0';
+          digits[currentIndex] = val;
 
-      if (m > 12) m = 12;
-      if (currentIndex > 1 && m == 0) m = 1; 
+          int d = digits[0] * 10 + digits[1];
+          int m = digits[2] * 10 + digits[3];
+          int y = digits[4] * 1000 + digits[5] * 100 + digits[6] * 10 + digits[7];
 
-      int maxDays = getDaysInMonth(m == 0 ? 1 : m, y); 
-      if (d > maxDays) d = maxDays;
-      if (currentIndex <= 1 && d == 0 && currentIndex == 1) d = 1; 
+          if (m > 12) m = 12;
+          if (currentIndex > 1 && m == 0) m = 1; 
 
-      digits[0] = d / 10;
-      digits[1] = d % 10;
-      digits[2] = m / 10;
-      digits[3] = m % 10;
-      digits[4] = y / 1000;
-      digits[5] = (y / 100) % 10;
-      digits[6] = (y / 10) % 10;
-      digits[7] = y % 10;
+          int maxDays = getDaysInMonth(m == 0 ? 1 : m, y); 
+          if (d > maxDays) d = maxDays;
+          if (currentIndex <= 1 && d == 0 && currentIndex == 1) d = 1; 
 
-      if (currentIndex < 7) currentIndex++;
-    }
-    else if (inchar == 13) {
-      char dateBuf[11];
-      snprintf(dateBuf, sizeof(dateBuf), "%02d/%02d/%04d", 
-               digits[0]*10 + digits[1], 
-               digits[2]*10 + digits[3], 
-               digits[4]*1000 + digits[5]*100 + digits[6]*10 + digits[7]);
-      
-      return String(dateBuf);
+          digits[0] = d / 10;
+          digits[1] = d % 10;
+          digits[2] = m / 10;
+          digits[3] = m % 10;
+          digits[4] = y / 1000;
+          digits[5] = (y / 100) % 10;
+          digits[6] = (y / 10) % 10;
+          digits[7] = y % 10;
+
+          if (currentIndex < 7) currentIndex++;
+        }
+        else if (inchar == 13) {
+          char dateBuf[11];
+          snprintf(dateBuf, sizeof(dateBuf), "%02d/%02d/%04d", 
+                   digits[0]*10 + digits[1], 
+                   digits[2]*10 + digits[3], 
+                   digits[4]*1000 + digits[5]*100 + digits[6]*10 + digits[7]);
+          
+          return String(dateBuf);
+        }
+      }
     }
 
     u8g2.clearBuffer();
@@ -1082,10 +1094,9 @@ void waitForKeypress(String message) {
     }
 
     int currentMillis = millis();
+    char inchar = KB().updateKeypress();
 
     if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
-      char inchar = KB().updateKeypress();
-
       if (inchar != 0) {
         KBBounceMillis = currentMillis; 
         break; // Break on any key, including Kill Signal

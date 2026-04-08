@@ -228,102 +228,107 @@ String fileWizardMini(bool allowRecentSelect, String rootDir, char inchar_) {
     selectedDirectory = rootDir;
   }
 
-  // Handle Inputs
+  // 1. Always drain the buffer continuously
   int currentMillis = millis();
-  if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
-    char inchar;
-    if (inchar_ == 0) inchar = KB().updateKeypress();
-    else inchar = inchar_;
+  char inchar = 0;
+  if (inchar_ == 0) {
+    inchar = KB().updateKeypress();
+  } else {
+    inchar = inchar_;
+  }
 
-    // HANDLE INPUTS
-    if (inchar == 0);
-    // SHIFT Recieved
-    else if (inchar == 17) {
-      if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) {
-        KB().setKeyboardState(NORMAL);
-      } else if (KB().getKeyboardState() == FUNC) {
-        KB().setKeyboardState(FN_SHIFT);
-      } else {
-        KB().setKeyboardState(SHIFT);
-      }
-    }
-    // FN Recieved
-    else if (inchar == 18) {
-      if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) {
-        KB().setKeyboardState(NORMAL);
-      } else if (KB().getKeyboardState() == SHIFT) {
-        KB().setKeyboardState(FN_SHIFT);
-      } else {
-        KB().setKeyboardState(FUNC);
-      }
-    }
-    // Left received
-    else if (inchar == 19) {
-      scrollDelta = -1;
-    }  
-    // Right received
-    else if (inchar == 21) {
-      scrollDelta = 1;
-    } 
-    // Exit received
-    else if (inchar == 12) {
-      return "_EXIT_";
-    }
-    // Back received
-    else if (inchar == 8) {
-      // If not at rootDir, go up one directory
-      if (selectedDirectory != rootDir) {
-        int lastSlash = selectedDirectory.lastIndexOf('/');
-        if (lastSlash > 0) {
-          selectedDirectory = selectedDirectory.substring(0, lastSlash);
+  // 2. Process input only if cooldown has expired
+  if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
+    if (inchar != 0) {
+      KBBounceMillis = currentMillis;  // reset debounce timer
+
+      // HANDLE INPUTS
+      if (inchar == 17) {
+        if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) {
+          KB().setKeyboardState(NORMAL);
+        } else if (KB().getKeyboardState() == FUNC) {
+          KB().setKeyboardState(FN_SHIFT);
         } else {
-          selectedDirectory = rootDir;
+          KB().setKeyboardState(SHIFT);
         }
       }
-    }
-    // Select received
-    else if (inchar == 20 || inchar == 29 || inchar == 7 || inchar == 13) {
-      if (selectedPath != "") {
-        File entry = global_fs->open(selectedPath);
-        if (entry) {
-          bool isDirectory = entry.isDirectory();
-          entry.close();
+      // FN Recieved
+      else if (inchar == 18) {
+        if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) {
+          KB().setKeyboardState(NORMAL);
+        } else if (KB().getKeyboardState() == SHIFT) {
+          KB().setKeyboardState(FN_SHIFT);
+        } else {
+          KB().setKeyboardState(FUNC);
+        }
+      }
+      // Left received
+      else if (inchar == 19) {
+        scrollDelta = -1;
+      }  
+      // Right received
+      else if (inchar == 21) {
+        scrollDelta = 1;
+      } 
+      // Exit received
+      else if (inchar == 12) {
+        return "_EXIT_";
+      }
+      // Back received
+      else if (inchar == 8) {
+        // If not at rootDir, go up one directory
+        if (selectedDirectory != rootDir) {
+          int lastSlash = selectedDirectory.lastIndexOf('/');
+          if (lastSlash > 0) {
+            selectedDirectory = selectedDirectory.substring(0, lastSlash);
+          } else {
+            selectedDirectory = rootDir;
+          }
+        }
+      }
+      // Select received
+      else if (inchar == 20 || inchar == 29 || inchar == 7 || inchar == 13) {
+        if (selectedPath != "") {
+          File entry = global_fs->open(selectedPath);
+          if (entry) {
+            bool isDirectory = entry.isDirectory();
+            entry.close();
 
-          if (isDirectory) {
-            selectedDirectory = selectedPath;
-            // Clamp to rootDir if needed
-            if (selectedDirectory.length() < rootDir.length() || 
-                !selectedDirectory.startsWith(rootDir)) {
-              selectedDirectory = rootDir;
+            if (isDirectory) {
+              selectedDirectory = selectedPath;
+              // Clamp to rootDir if needed
+              if (selectedDirectory.length() < rootDir.length() || 
+                  !selectedDirectory.startsWith(rootDir)) {
+                selectedDirectory = rootDir;
+              }
+            }
+            else {
+              return selectedPath;
             }
           }
-          else {
-            return selectedPath;
-          }
+        }
+      }
+      else if (allowRecentSelect && (inchar >= '0' && inchar <= '9')) {
+        int fileIndex = (inchar == '0') ? 10 : (inchar - '0');
+        // SET WORKING FILE
+        String selectedFile = PM_SDAUTO().getFilesListIndex(fileIndex - 1);
+        if (selectedFile != "-" && selectedFile != "") {
+          PM_SDAUTO().setWorkingFile(selectedFile);
+          // GO TO WIZ1_
+          CurrentFileWizState = WIZ1_;
+          newState = true;
         }
       }
     }
-    else if (allowRecentSelect && (inchar >= '0' && inchar <= '9')) {
-      int fileIndex = (inchar == '0') ? 10 : (inchar - '0');
-      // SET WORKING FILE
-      String selectedFile = PM_SDAUTO().getFilesListIndex(fileIndex - 1);
-      if (selectedFile != "-" && selectedFile != "") {
-        PM_SDAUTO().setWorkingFile(selectedFile);
-        // GO TO WIZ1_
-        CurrentFileWizState = WIZ1_;
-        newState = true;
-      }
-    }
+  }
 
-    KBBounceMillis = currentMillis;  // reset debounce timer
-
-    // Make sure OLED only updates at OLED_MAX_FPS
-    if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
-      OLEDFPSMillis = currentMillis;
-      // Display OLED file list
-      String temp_selectedPath = renderWizMini(selectedDirectory, scrollDelta);
-      if (temp_selectedPath != "") selectedPath = temp_selectedPath;
-    }
+  // 3. Make sure OLED only updates at OLED_MAX_FPS (Independent of KB_COOLDOWN)
+  currentMillis = millis();
+  if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
+    OLEDFPSMillis = currentMillis;
+    // Display OLED file list
+    String temp_selectedPath = renderWizMini(selectedDirectory, scrollDelta);
+    if (temp_selectedPath != "") selectedPath = temp_selectedPath;
   }
 
   if (SAVE_POWER) pocketmage::setCpuSpeed(POWER_SAVE_FREQ);
@@ -403,6 +408,7 @@ void processKB_FILEWIZ() {
   OLED().setPowerSave(false);
   int currentMillis = millis();
   String outPath = "";
+  char inchar = 0;
 
   switch (CurrentFileWizState) {
     case WIZ0_:
@@ -426,93 +432,99 @@ void processKB_FILEWIZ() {
     case WIZ1_:
       disableTimeout = false;
       KB().setKeyboardState(FUNC);
-      currentMillis = millis();
       
+      // 1. Drain the hardware buffer continuously at loop speed
+      inchar = KB().updateKeypress();
+      
+      // 2. Only process the actual input if the cooldown has expired
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-        char inchar = KB().updateKeypress();
-        
-        if (inchar == 0);
-        // BKSP Recieved (Go back to WIZ0)
-        else if (inchar == 127 || inchar == 8 || inchar == 12) {
-          FILEWIZ_INIT();
-          break;
-        }
-        else if (inchar >= '1' && inchar <= '4') {
-          
-          // Get the current file path and isolate its directory & extension
-          String oldPath = PM_SDAUTO().getWorkingFile();
-          int lastSlash = oldPath.lastIndexOf('/');
-          int lastDot = oldPath.lastIndexOf('.');
-          
-          String dirPath = (lastSlash != -1) ? oldPath.substring(0, lastSlash + 1) : "/";
-          String extension = (lastDot != -1 && lastDot > lastSlash) ? oldPath.substring(lastDot) : "";
+        if (inchar != 0) {
+          KBBounceMillis = currentMillis;
 
-          // --- 1. RENAME FILE ---
-          if (inchar == '1') { 
-            KB().setKeyboardState(NORMAL);
-            String input = textPrompt("Enter new filename:");
-            if (input == "_RETURN_") return;
-            else if (input != "_EXIT_" && input != "") {
-              OLED().oledWord("Renaming...");
-              
-              String newName = dirPath + input + extension; 
-              PM_SDAUTO().renFile(oldPath, newName);
-              
-              refreshFiles = true;
-              CurrentFileWizState = WIZ0_;
-              newState = true;
-            }
+          // BKSP Recieved (Go back to WIZ0)
+          if (inchar == 127 || inchar == 8 || inchar == 12) {
+            FILEWIZ_INIT();
+            break;
           }
-          // --- 2. DELETE FILE ---
-          else if (inchar == '2') { 
-            int response = boolPrompt("Delete File?");
-            if (response == 1) {
-              OLED().oledWord("Deleting...");
-              PM_SDAUTO().delFile(oldPath);
-              
-              refreshFiles = true;
-              CurrentFileWizState = WIZ0_;
-              newState = true;
+          else if (inchar >= '1' && inchar <= '4') {
+            
+            // Get the current file path and isolate its directory & extension
+            String oldPath = PM_SDAUTO().getWorkingFile();
+            int lastSlash = oldPath.lastIndexOf('/');
+            int lastDot = oldPath.lastIndexOf('.');
+            
+            String dirPath = (lastSlash != -1) ? oldPath.substring(0, lastSlash + 1) : "/";
+            String extension = (lastDot != -1 && lastDot > lastSlash) ? oldPath.substring(lastDot) : "";
+
+            // --- 1. RENAME FILE ---
+            if (inchar == '1') { 
+              KB().setKeyboardState(NORMAL);
+              String input = textPrompt("Enter new filename:");
+              if (input == "_RETURN_") return;
+              else if (input != "_EXIT_" && input != "") {
+                OLED().oledWord("Renaming...");
+                
+                String newName = dirPath + input + extension; 
+                PM_SDAUTO().renFile(oldPath, newName);
+                
+                refreshFiles = true;
+                CurrentFileWizState = WIZ0_;
+                newState = true;
+              }
             }
-          }
-          // --- 3. COPY FILE ---
-          else if (inchar == '3') { 
-            KB().setKeyboardState(NORMAL);
-            String input = textPrompt("Enter copy name:");
-            if (input == "_RETURN_") return;
-            else if (input != "_EXIT_" && input != "") {
-              OLED().oledWord("Copying...");
-              
-              String newName = dirPath + input + extension;
-              PM_SDAUTO().copyFile(oldPath, newName);
-              
-              refreshFiles = true;
-              CurrentFileWizState = WIZ0_;
-              newState = true;
+            // --- 2. DELETE FILE ---
+            else if (inchar == '2') { 
+              int response = boolPrompt("Delete File?");
+              if (response == 1) {
+                OLED().oledWord("Deleting...");
+                PM_SDAUTO().delFile(oldPath);
+                
+                refreshFiles = true;
+                CurrentFileWizState = WIZ0_;
+                newState = true;
+              }
             }
-          }
-          // --- 4. ELABORATE (INFO) ---
-          else if (inchar == '4') { 
-            File f = global_fs->open(oldPath, FILE_READ);
-            if (f) {
-              size_t fSize = f.size();
-              f.close(); // Safety close
-              
-              String info = "Size: " + String(fSize) + " Bytes.";
-              waitForKeypress(info);
-            } else {
-              OLED().sysMessage("Error reading file",1500);
+            // --- 3. COPY FILE ---
+            else if (inchar == '3') { 
+              KB().setKeyboardState(NORMAL);
+              String input = textPrompt("Enter copy name:");
+              if (input == "_RETURN_") return;
+              else if (input != "_EXIT_" && input != "") {
+                OLED().oledWord("Copying...");
+                
+                String newName = dirPath + input + extension;
+                PM_SDAUTO().copyFile(oldPath, newName);
+                
+                refreshFiles = true;
+                CurrentFileWizState = WIZ0_;
+                newState = true;
+              }
             }
-            KB().setKeyboardState(FUNC); 
+            // --- 4. ELABORATE (INFO) ---
+            else if (inchar == '4') { 
+              File f = global_fs->open(oldPath, FILE_READ);
+              if (f) {
+                size_t fSize = f.size();
+                f.close(); // Safety close
+                
+                String info = "Size: " + String(fSize) + " Bytes.";
+                waitForKeypress(info);
+              } else {
+                OLED().sysMessage("Error reading file",1500);
+              }
+              KB().setKeyboardState(FUNC); 
+            }
           }
         }
+      }
 
-        currentMillis = millis();
-        if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
-          OLEDFPSMillis = currentMillis;
+      // 3. Update OLED at true OLED_MAX_FPS, completely independent of keyboard bounce
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000/OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        if (CurrentFileWizState == WIZ1_) { // Make sure we didn't just jump back to WIZ0_
           OLED().oledWord("Select an operation");
         }
-        KBBounceMillis = currentMillis;
       }
       break;
   }

@@ -207,26 +207,34 @@ void USB_INIT() {
 
 void processKB_USB() {
   int currentMillis = millis();
-  //Make sure oled only updates at 10FPS
+  char inchar = 0;
+
+  // 1. Drain the hardware buffer continuously at loop speed
+  inchar = KB().updateKeypress();
+
+  // 2. Only process the actual input if the cooldown has expired
+  if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
+    if (inchar != 0) {
+      KBBounceMillis = currentMillis; // Reset the debounce timer
+
+      // HANDLE INPUTS
+      // Home / Exit / App Switcher recieved
+      if (inchar == 12 || inchar == 8 || inchar == 19 || inchar == 28 || inchar == 23) {
+        USBAppShutdown();
+        prefs.begin("PocketMage", false);
+        prefs.putInt("CurrentAppState", static_cast<int>(HOME));
+        prefs.putBool("Seamless_Reboot", true);
+        prefs.end();
+        esp_restart();
+      }
+    }
+  }
+
+  // 3. Update OLED at 10FPS, completely independent of keyboard bounce
+  currentMillis = millis();
   if (currentMillis - OLEDFPSMillis >= (1000/10 /*OLED_MAX_FPS*/)) {
     OLEDFPSMillis = currentMillis;
     OLED().oledLine(currentLine, currentLine.length(), false);
-  }
-  
-  if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {  
-    char inchar = KB().updateKeypress();
-    // HANDLE INPUTS
-    //No char recieved
-    if (inchar == 0);   
-    // Home recieved
-    else if (inchar == 12 || inchar == 8 || inchar == 19 || inchar == 28) {
-      USBAppShutdown();
-      prefs.begin("PocketMage", false);
-      prefs.putInt("CurrentAppState", static_cast<int>(HOME));
-      prefs.putBool("Seamless_Reboot", true);
-      prefs.end();
-      esp_restart();
-    }
   }
 }
 

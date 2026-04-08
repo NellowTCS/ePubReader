@@ -2024,6 +2024,7 @@ void processKB_TXT_NEW() {
   
   static String inputBuffer = "";
 
+  // 1. Drain the hardware buffer continuously at loop speed
   char inchar = KB().updateKeypress();
   unsigned long currentMillis = millis();
 
@@ -2044,109 +2045,124 @@ void processKB_TXT_NEW() {
       break;
 
     case SAVE_AS:
+      // 2. Process input only if cooldown has expired
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
-        if (inchar == 0) {
-          // Do nothing
-        }
-        else if (inchar == 13) {
-          if (inputBuffer != "" && inputBuffer != "-") {
-            if (!inputBuffer.startsWith("/notes/")) inputBuffer = "/notes/" + inputBuffer;
-            if (!inputBuffer.endsWith(".txt") && !inputBuffer.endsWith(".md")) inputBuffer = inputBuffer + ".txt";
-            saveMarkdownFile(inputBuffer);
-            CurrentTXTState_NEW = TXT_;
-          } else {
-            OLED().sysMessage("Invalid Name",2000);
-          }
-          inputBuffer = "";
-        }
-        else if (inchar == 17) {
-          if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
-          else if (KB().getKeyboardState() == FUNC) KB().setKeyboardState(FN_SHIFT);
-          else KB().setKeyboardState(SHIFT);
-        }
-        else if (inchar == 18) {
-          if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
-          else if (KB().getKeyboardState() == SHIFT) KB().setKeyboardState(FN_SHIFT);
-          else KB().setKeyboardState(FUNC);
-        }
-        else if (inchar == 32) {
-        }
-        else if (inchar == 20) {
-          inputBuffer = "";
-        }
-        else if (inchar == 8) {
-          if (inputBuffer.length() > 0) {
-            inputBuffer.remove(inputBuffer.length() - 1);
-          }
-        }
-        else if (inchar == 12) {
-          CurrentTXTState_NEW = TXT_;
-        }
-        else {
-          inputBuffer += inchar;
-          if (inchar >= 48 && inchar <= 57) {} 
-          else if (KB().getKeyboardState() != NORMAL) {
-            KB().setKeyboardState(NORMAL);
-          }
-        }
+        if (inchar != 0) {
+          KBBounceMillis = currentMillis; // Reset the debounce timer
 
-        if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
-          OLEDFPSMillis = currentMillis;
-          OLED().oledLine(inputBuffer, inputBuffer.length(), false, "Input Filename");
+          if (inchar == 13) {
+            if (inputBuffer != "" && inputBuffer != "-") {
+              if (!inputBuffer.startsWith("/notes/")) inputBuffer = "/notes/" + inputBuffer;
+              if (!inputBuffer.endsWith(".txt") && !inputBuffer.endsWith(".md")) inputBuffer = inputBuffer + ".txt";
+              saveMarkdownFile(inputBuffer);
+              CurrentTXTState_NEW = TXT_;
+            } else {
+              OLED().sysMessage("Invalid Name", 2000);
+            }
+            inputBuffer = "";
+          }
+          else if (inchar == 17) {
+            if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
+            else if (KB().getKeyboardState() == FUNC) KB().setKeyboardState(FN_SHIFT);
+            else KB().setKeyboardState(SHIFT);
+          }
+          else if (inchar == 18) {
+            if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
+            else if (KB().getKeyboardState() == SHIFT) KB().setKeyboardState(FN_SHIFT);
+            else KB().setKeyboardState(FUNC);
+          }
+          else if (inchar == 32) {
+          }
+          else if (inchar == 20) {
+            inputBuffer = "";
+          }
+          else if (inchar == 8) {
+            if (inputBuffer.length() > 0) {
+              inputBuffer.remove(inputBuffer.length() - 1);
+            }
+          }
+          else if (inchar == 12) {
+            CurrentTXTState_NEW = TXT_;
+          }
+          else {
+            inputBuffer += inchar;
+            if (inchar >= 48 && inchar <= 57) {} 
+            else if (KB().getKeyboardState() != NORMAL) {
+              KB().setKeyboardState(NORMAL);
+            }
+          }
+        }
+      }
+
+      // 3. Update OLED at true OLED_MAX_FPS
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        // Make sure we didn't just jump back to the text editor!
+        if (CurrentTXTState_NEW == SAVE_AS) {
+            OLED().oledLine(inputBuffer, inputBuffer.length(), false, "Input Filename");
         }
       }
       break;
 
     case NEW_FILE:
+      // 2. Process input only if cooldown has expired
       if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
-        if (inchar == 0) {
-        }
-        else if (inchar == 13) {
-          if (inputBuffer != "" && inputBuffer != "-") {
-            if (!inputBuffer.startsWith("/notes/")) inputBuffer = "/notes/" + inputBuffer;
-            if (!inputBuffer.endsWith(".txt") && !inputBuffer.endsWith(".md")) inputBuffer = inputBuffer + ".txt";
-            newMarkdownFile(inputBuffer);
-            CurrentTXTState_NEW = TXT_;
-            updateScreen = true;
-          } else {
-            OLED().sysMessage("Invalid Name",2000);
-          }
-          inputBuffer = "";
-        }
-        else if (inchar == 17) {
-          if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
-          else if (KB().getKeyboardState() == FUNC) KB().setKeyboardState(FN_SHIFT);
-          else KB().setKeyboardState(SHIFT);
-        }
-        else if (inchar == 18) {
-          if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
-          else if (KB().getKeyboardState() == SHIFT) KB().setKeyboardState(FN_SHIFT);
-          else KB().setKeyboardState(FUNC);
-        }
-        else if (inchar == 32) {
-        }
-        else if (inchar == 20) {
-          inputBuffer = "";
-        }
-        else if (inchar == 8) {
-          if (inputBuffer.length() > 0) {
-            inputBuffer.remove(inputBuffer.length() - 1);
-          }
-        }
-        else if (inchar == 12) {
-          CurrentTXTState_NEW = TXT_;
-        }
-        else {
-          inputBuffer += inchar;
-          if (inchar >= 48 && inchar <= 57) {} 
-          else if (KB().getKeyboardState() != NORMAL) {
-            KB().setKeyboardState(NORMAL);
-          }
-        }
+        if (inchar != 0) {
+          KBBounceMillis = currentMillis; // Reset the debounce timer
 
-        if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
-          OLEDFPSMillis = currentMillis;
-          OLED().oledLine(inputBuffer, inputBuffer.length(), false, "Name New File");
+          if (inchar == 13) {
+            if (inputBuffer != "" && inputBuffer != "-") {
+              if (!inputBuffer.startsWith("/notes/")) inputBuffer = "/notes/" + inputBuffer;
+              if (!inputBuffer.endsWith(".txt") && !inputBuffer.endsWith(".md")) inputBuffer = inputBuffer + ".txt";
+              newMarkdownFile(inputBuffer);
+              CurrentTXTState_NEW = TXT_;
+              updateScreen = true;
+            } else {
+              OLED().sysMessage("Invalid Name", 2000);
+            }
+            inputBuffer = "";
+          }
+          else if (inchar == 17) {
+            if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
+            else if (KB().getKeyboardState() == FUNC) KB().setKeyboardState(FN_SHIFT);
+            else KB().setKeyboardState(SHIFT);
+          }
+          else if (inchar == 18) {
+            if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
+            else if (KB().getKeyboardState() == SHIFT) KB().setKeyboardState(FN_SHIFT);
+            else KB().setKeyboardState(FUNC);
+          }
+          else if (inchar == 32) {
+          }
+          else if (inchar == 20) {
+            inputBuffer = "";
+          }
+          else if (inchar == 8) {
+            if (inputBuffer.length() > 0) {
+              inputBuffer.remove(inputBuffer.length() - 1);
+            }
+          }
+          else if (inchar == 12) {
+            CurrentTXTState_NEW = TXT_;
+          }
+          else {
+            inputBuffer += inchar;
+            if (inchar >= 48 && inchar <= 57) {} 
+            else if (KB().getKeyboardState() != NORMAL) {
+              KB().setKeyboardState(NORMAL);
+            }
+          }
+        }
+      }
+
+      // 3. Update OLED at true OLED_MAX_FPS
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        // Make sure we didn't just jump back to the text editor!
+        if (CurrentTXTState_NEW == NEW_FILE) {
+            OLED().oledLine(inputBuffer, inputBuffer.length(), false, "Name New File");
         }
       }
       break;
@@ -2165,7 +2181,7 @@ void processKB_TXT_NEW() {
           CurrentTXTState_NEW = TXT_;
           updateScreen = true;
         } else {
-          OLED().sysMessage("Incompatible Filetype!",2000);
+          OLED().sysMessage("Incompatible Filetype!", 2000);
           CurrentTXTState_NEW = TXT_;
         }
       }
