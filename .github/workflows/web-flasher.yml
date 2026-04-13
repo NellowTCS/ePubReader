@@ -46,18 +46,20 @@ jobs:
       - name: Forge the PocketMage Firmware
         run: |
           set -euo pipefail
-          pio run -e PM_V3
-          echo "Build directory contents:"
-          ls -lh .pio/build/PM_V3/*.bin
+          pio run -e PM_BETA
+          pio run -e PM_PRODUCTION
+          echo "Build directory contents (Beta):"
+          ls -lh .pio/build/PM_BETA/*.bin
+          echo "Build directory contents (Production):"
+          ls -lh .pio/build/PM_PRODUCTION/*.bin
 
       - name: Divine Partition Offsets
         id: offsets
         run: |
           set -euo pipefail
           
-          # Read offsets from partition CSV (expect 0x-prefixed hex or decimal)
           APP0_OFFSET=$(grep "^app0," partitions_4APP.csv | cut -d',' -f4 | tr -d ' ')
-          PARTITIONS_OFFSET="0x8000"  # Standard for ESP32
+          PARTITIONS_OFFSET="0x8000"
           
           echo "bootloader_offset=0x0" >> $GITHUB_OUTPUT
           echo "partitions_offset=$PARTITIONS_OFFSET" >> $GITHUB_OUTPUT
@@ -88,10 +90,8 @@ jobs:
         run: |
           set -euo pipefail
           
-          # Retrieve release tag (empty when not triggered by release event)
           RELEASE_TAG="${{ github.event.release.tag_name }}"
           
-          # Use timestamped dev version for non-release builds
           if [ -z "$RELEASE_TAG" ]; then
             RELEASE_TAG="dev-$(date +%Y%m%d-%H%M%S)"
           fi
@@ -104,23 +104,11 @@ jobs:
           set -euo pipefail
 
           RELEASE_TAG="${{ steps.version.outputs.release_tag }}"
-
-          BUILD_DIR="$GITHUB_WORKSPACE/Code/PocketMage_V3/.pio/build/PM_V3"
           TARGET_DIR="$GITHUB_WORKSPACE/docs/firmware/${RELEASE_TAG}"
-          mkdir -p "${TARGET_DIR}"
 
-          # Copy all firmware files
-          cp "${BUILD_DIR}/firmware.bin" "${TARGET_DIR}/firmware.bin"
-          cp "${BUILD_DIR}/bootloader.bin" "${TARGET_DIR}/bootloader.bin"
-          cp "${BUILD_DIR}/partitions.bin" "${TARGET_DIR}/partitions.bin"
-
-          echo "Created firmware package for version: $RELEASE_TAG"
-
-          # Get partition offsets from previous step
           PARTITIONS_OFFSET="${{ steps.offsets.outputs.partitions_offset }}"
           APP0_OFFSET_HEX="${{ steps.offsets.outputs.app0_offset }}"
 
-          # Convert hex (0x...) or decimal to decimal using bash arithmetic expansion
           to_decimal() {
             local v="$1"
             v=$(echo "$v" | tr -d '[:space:]')
@@ -138,39 +126,48 @@ jobs:
           PARTITIONS_OFFSET_DEC=$(to_decimal "$PARTITIONS_OFFSET")
           APP0_OFFSET_DEC=$(to_decimal "$APP0_OFFSET_HEX")
 
-          # Create a single manifest with all parts
-          jq -n \
-            --arg ver "$RELEASE_TAG" \
-            --argjson part_off "$PARTITIONS_OFFSET_DEC" \
-            --argjson app_off "$APP0_OFFSET_DEC" \
-            '{
-              name: "PocketMage OS",
-              version: $ver,
-              home_assistant_domain: "",
-              new_install_prompt_erase: true,
-              builds: [{
-                chipFamily: "ESP32-S3",
-                parts: [
-                  {
-                    path: "bootloader.bin",
-                    offset: 0
-                  },
-                  {
-                    path: "partitions.bin",
-                    offset: $part_off
-                  },
-                  {
-                    path: "firmware.bin",
-                    offset: $app_off
-                  }
-                ]
-              }]
-            }' > "${TARGET_DIR}/manifest.json"
+          for ENV in PM_BETA PM_PRODUCTION; do
+            BUILD_DIR="$GITHUB_WORKSPACE/Code/PocketMage_V3/.pio/build/$ENV"
+            ENV_TARGET_DIR="${TARGET_DIR}/$ENV"
+            mkdir -p "${ENV_TARGET_DIR}"
 
-          # Ensure docs folder exists
+            cp "${BUILD_DIR}/firmware.bin" "${ENV_TARGET_DIR}/firmware.bin"
+            cp "${BUILD_DIR}/bootloader.bin" "${ENV_TARGET_DIR}/bootloader.bin"
+            cp "${BUILD_DIR}/partitions.bin" "${ENV_TARGET_DIR}/partitions.bin"
+
+            jq -n \
+              --arg ver "$RELEASE_TAG" \
+              --argjson part_off "$PARTITIONS_OFFSET_DEC" \
+              --argjson app_off "$APP0_OFFSET_DEC" \
+              '{
+                name: "PocketMage OS",
+                version: $ver,
+                home_assistant_domain: "",
+                new_install_prompt_erase: true,
+                builds: [{
+                  chipFamily: "ESP32-S3",
+                  parts: [
+                    {
+                      path: "bootloader.bin",
+                      offset: 0
+                    },
+                    {
+                      path: "partitions.bin",
+                      offset: $part_off
+                    },
+                    {
+                      path: "firmware.bin",
+                      offset: $app_off
+                    }
+                  ]
+                }]
+              }' > "${ENV_TARGET_DIR}/manifest.json"
+          done
+
+          echo "Created firmware packages for version: $RELEASE_TAG"
+
           mkdir -p "$GITHUB_WORKSPACE/docs"
 
-          # Update or create version index
           INDEX_FILE="$GITHUB_WORKSPACE/docs/manifest-index.json"
           if [ -f "${INDEX_FILE}" ]; then
             jq --arg v "$RELEASE_TAG" '
