@@ -26,11 +26,12 @@ void printDebug() {
   }
 }
 
+#if OTA_APP
 void checkTimeout() {
   int randomScreenSaver = 0;
   CLOCK().setTimeoutMillis(millis());
   ESP_LOGV(TAG, "checking timeout");
-  
+
   // Trigger timeout deep sleep
   if (!disableTimeout) {
     if (CLOCK().getTimeDiff() >= TIMEOUT * 1000) {
@@ -52,25 +53,80 @@ void checkTimeout() {
         vTaskDelay(pdMS_TO_TICKS(10)); // Prevent watchdog starvation during this while loop
       }
 
-#if !OTA_APP
-      saveEditingFile();
-#else
       // user skipped reboot flag if true, return to OS normally
       if (!pocketmage::setRebootFlagOTA()) {
         return;
       }
       display.setFullWindow();
-#endif
+      pocketmage::deepSleep();
+    }
+  } else {
+    CLOCK().setPrevTimeMillis(millis());
+  }
+
+  // Power Button Event sleep
+  if (PWR_BTN_event && CurrentHOMEState != NOWLATER) {
+    PWR_BTN_event = false;
+    ESP_LOGE(TAG, "Power Button Event: Sleeping now");
+    pocketmage::deepSleep();
+
+  } else if (PWR_BTN_event && CurrentHOMEState == NOWLATER) {
+    ESP_LOGE(TAG, "In NOWLATER state, returning home");
+    loadState();
+    keypad.flush();
+
+    CurrentHOMEState = HOME_HOME;
+    PWR_BTN_event = false;
+    OLED().setPowerSave(false);
+    display.fillScreen(GxEPD_WHITE);
+    EINK().forceSlowFullUpdate(true);
+
+    // Play startup jingle
+    BZ().playJingle(Jingles::Startup);
+
+    EINK().refresh();
+    delay(200);
+    newState = true;
+  }
+}
+
+#else // OS APPLICATION
+void checkTimeout() {
+  int randomScreenSaver = 0;
+  CLOCK().setTimeoutMillis(millis());
+  ESP_LOGV(TAG, "checking timeout");
+
+  // Trigger timeout deep sleep
+  if (!disableTimeout) {
+    if (CLOCK().getTimeDiff() >= TIMEOUT * 1000) {
+      ESP_LOGD(TAG, "Device idle... Deep sleeping");
+
+      // Give a chance to keep device awake
+      OLED().oledWord("  Going to sleep!  ");
+      unsigned long i = millis();
+      unsigned long j = millis();
+      while ((j - i) <= 4000) {  // 4 sec
+        j = millis();
+        if (KB().updateKeypress() != 0) {
+          OLED().oledWord("Good Save!");
+          delay(500);
+          CLOCK().setPrevTimeMillis(millis()); // Reset system idle timer
+          keypad.flush();
+          return;
+        }
+        vTaskDelay(pdMS_TO_TICKS(10)); // Prevent watchdog starvation during this while loop
+      }
+
+      saveEditingFile();
 
       switch (CurrentAppState) {
-#if !OTA_APP
         case TXT:
-          if (SLEEPMODE == "TEXT" && PM_SDAUTO().getEditingFile() != "" && !OTA_APP) {
+          if (SLEEPMODE == "TEXT" && PM_SDAUTO().getEditingFile() != "") {
             pocketmage::deepSleep(true);
-          } else
+          } else {
             pocketmage::deepSleep();
+          }
           break;
-#endif
         default:
           pocketmage::deepSleep();
           break;
@@ -85,11 +141,9 @@ void checkTimeout() {
     PWR_BTN_event = false;
     ESP_LOGE(TAG, "Power Button Event: Sleeping now");
 
-#if !OTA_APP
     saveEditingFile();
-#endif
 
-    if (digitalRead(CHRG_SENS) == HIGH && !OTA_APP) {
+    if (digitalRead(CHRG_SENS) == HIGH) {
       // Save last state
       prefs.begin("PocketMage", false);
       prefs.putInt("CurrentAppState", static_cast<int>(CurrentAppState));
@@ -99,10 +153,9 @@ void checkTimeout() {
       CurrentAppState = HOME;
       CurrentHOMEState = NOWLATER;
 
-#if !OTA_APP
       updateTaskArray();
       sortTasksByDueDate(tasks);
-#endif
+      
       u8g2.clearBuffer();
       OLED().oledWord(" ");
       OLED().setPowerSave(true);
@@ -120,7 +173,7 @@ void checkTimeout() {
       ESP_LOGD(TAG, "Not charging");
       switch (CurrentAppState) {
         case TXT:
-          if (SLEEPMODE == "TEXT" && PM_SDAUTO().getEditingFile() != "" && !OTA_APP) {
+          if (SLEEPMODE == "TEXT" && PM_SDAUTO().getEditingFile() != "") {
             ESP_LOGE(TAG, "text sleep mode");
             EINK().setFullRefreshAfter(FULL_REFRESH_AFTER + 1);
             display.setFullWindow();
@@ -138,8 +191,9 @@ void checkTimeout() {
             pocketmage::deepSleep(true);
           }
           // Sleep device normally
-          else
+          else {
             pocketmage::deepSleep();
+          }
           break;
         default:
           pocketmage::deepSleep();
@@ -166,6 +220,8 @@ void checkTimeout() {
     newState = true;
   }
 }
+
+#endif
 
 void loadState(bool changeState) {
   // LOAD PREFERENCES
