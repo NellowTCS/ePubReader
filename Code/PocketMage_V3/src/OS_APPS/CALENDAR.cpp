@@ -66,7 +66,7 @@ void CALENDAR_INIT() {
   newState = true;
 }
 
-// Event Data Management
+#pragma region Event Data Management
 void updateEventArray() {
   SDActive = true;
   pocketmage::setCpuSpeed(240);
@@ -219,7 +219,7 @@ void updateEventByIndex(int indexToUpdate) {
   }
 }
 
-// General Functions
+#pragma region General Functions
 String intToYYYYMMDD(int year_, int month_, int date_) {
   String y = String(year_);
   String m = (month_ < 10 ? "0" : "") + String(month_);
@@ -281,6 +281,176 @@ int daysInMonth(int year, int month) {
   } else {
     return 31;
   }
+}
+
+String repeatPrompt(String startDateStr) {
+  int year  = startDateStr.substring(0, 4).toInt();
+  int month = startDateStr.substring(4, 6).toInt();
+  int day   = startDateStr.substring(6, 8).toInt();
+  int dow   = getDayOfWeek(year, month, day);
+  int ordinal = ((day - 1) / 7) + 1;
+
+  const char* dowNames[] = {"SU", "MO", "TU", "WE", "TH", "FR", "SA"};
+  const char* monthNames[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+
+  // Helper for 1st, 2nd, 3rd, 4th
+  auto getOrdinalSuffix = [](int n) {
+      if(n == 1) return "st";
+      if(n == 2) return "nd";
+      if(n == 3) return "rd";
+      return "th";
+  };
+
+  // --- STEP 1: Select Repeat Mode ---
+  int mode = 0; // 0:NO, 1:DAILY, 2:WEEKLY, 3:MONTHLY, 4:YEARLY
+  const char* modes[] = {"No Repeat", "Daily", "Weekly", "Monthly", "Yearly"};
+
+  KB().setKeyboardState(NORMAL);
+  keypad.flush();
+
+  while(true) {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_6x10_tf);
+    u8g2.drawStr(0, 10, "Select Repeat:");
+    
+    u8g2.drawStr(15, 25, modes[mode]);
+    u8g2.drawStr(0, 25, "<");
+    u8g2.drawStr(120, 25, ">");
+    u8g2.sendBuffer();
+
+    char c = KB().updateKeypress();
+    if (c == 19 || c == 12) { // Left (Normal or Func)
+      mode--; if(mode < 0) mode = 4;
+    } else if (c == 21 || c == 6) { // Right (Normal or Func)
+      mode++; if(mode > 4) mode = 0;
+    } else if (c == 13 || c == 20 || c == 7) { // Enter / Center
+      break;
+    } else if (c == 8 || c == 127) { // Backspace to exit
+      return "_EXIT_";
+    }
+    delay(10);
+  }
+
+  if (mode == 0) return "NO";
+  if (mode == 1) return "DAILY";
+
+  // --- STEP 2A: WEEKLY ---
+  if (mode == 2) {
+    bool days[7] = {false};
+    days[dow] = true; // Auto select current day
+    int cursor = dow;
+    
+    while(true) {
+      u8g2.clearBuffer();
+      u8g2.setFont(u8g2_font_5x8_tf);
+      u8g2.drawStr(0, 8, "Select Weekly Days:");
+
+      // Placeholder Assets for Weekday Grid
+      for(int i = 0; i < 7; i++) {
+        int bx = 2 + (i * 18);
+        int by = 14;
+        if(days[i]) {
+          u8g2.drawBox(bx, by, 16, 14); // Selected: Filled box
+          u8g2.setDrawColor(0);
+          u8g2.drawStr(bx+3, by+10, dowNames[i]);
+          u8g2.setDrawColor(1);
+        } else {
+          u8g2.drawFrame(bx, by, 16, 14); // Unselected: Empty outline
+          u8g2.drawStr(bx+3, by+10, dowNames[i]);
+        }
+        if(i == cursor) {
+          // Cursor indicator (Triangle)
+          u8g2.drawTriangle(bx+8, by+15, bx+4, by+19, bx+12, by+19);
+        }
+      }
+      u8g2.sendBuffer();
+
+      char c = KB().updateKeypress();
+      if (c == 19 || c == 12) {
+        cursor--; if(cursor < 0) cursor = 6;
+      } else if (c == 21 || c == 6) {
+        cursor++; if(cursor > 6) cursor = 0;
+      } else if (c == 20 || c == 7 || c == 32) { // Center/Space toggles day
+        days[cursor] = !days[cursor];
+      } else if (c == 13) { 
+        String rep = "WEEKLY ";
+        for(int i=0; i<7; i++) {
+          if(days[i]) rep += String(dowNames[i]);
+        }
+        return rep;
+      } else if (c == 8 || c == 127) {
+        return "_EXIT_";
+      }
+      delay(10);
+    }
+  }
+
+  // --- STEP 2B: MONTHLY or YEARLY ---
+  if (mode == 3 || mode == 4) {
+    int sel = 0; // 0 = Date, 1 = Ordinal
+    
+    String dateStr, ordStr;
+    if (mode == 3) { // Monthly text formatting
+      dateStr = String(day) + getOrdinalSuffix(day);
+      ordStr = String(ordinal) + getOrdinalSuffix(ordinal) + " " + dowNames[dow];
+    } else { // Yearly text formatting
+      String mNameStr = monthNames[month-1];
+      mNameStr = mNameStr.substring(0,1) + mNameStr.substring(1);
+      mNameStr.toLowerCase();
+      mNameStr[0] = toupper(mNameStr[0]);
+      
+      dateStr = mNameStr + " " + String(day);
+      ordStr = String(ordinal) + getOrdinalSuffix(ordinal) + " " + dowNames[dow] + " in " + mNameStr;
+    }
+
+    while(true) {
+      u8g2.clearBuffer();
+      u8g2.setFont(u8g2_font_5x8_tf);
+      u8g2.drawStr(0, 8, mode == 3 ? "Monthly Repeat:" : "Yearly Repeat:");
+
+      // Placeholder Assets for Date vs Ordinal selection
+      if (sel == 0) { // Date pill selected
+        u8g2.drawRBox(0, 15, 60, 14, 3);
+        u8g2.setDrawColor(0);
+        u8g2.drawStr(4, 25, dateStr.c_str());
+        u8g2.setDrawColor(1);
+      } else {
+        u8g2.drawStr(4, 25, dateStr.c_str());
+      }
+
+      if (sel == 1) { // Ordinal pill selected
+        u8g2.drawRBox(64, 15, 64, 14, 3);
+        u8g2.setDrawColor(0);
+        u8g2.drawStr(68, 25, ordStr.c_str());
+        u8g2.setDrawColor(1);
+      } else {
+        u8g2.drawStr(68, 25, ordStr.c_str());
+      }
+      u8g2.sendBuffer();
+
+      char c = KB().updateKeypress();
+      if (c == 19 || c == 12) { sel = 0; }
+      else if (c == 21 || c == 6) { sel = 1; }
+      else if (c == 13 || c == 20 || c == 7) {
+        if (mode == 3) {
+          if (sel == 0) return "MONTHLY " + String(day);
+          else return "MONTHLY " + String(ordinal) + String(dowNames[dow]);
+        } else {
+          if (sel == 0) {
+            String dayStr = String(day);
+            if (day < 10) dayStr = "0" + dayStr;
+            return "YEARLY " + String(monthNames[month-1]) + dayStr;
+          } else {
+            return "YEARLY " + String(ordinal) + String(dowNames[dow]) + " " + String(monthNames[month-1]);
+          }
+        }
+      } else if (c == 8 || c == 127) {
+        return "_EXIT_";
+      }
+      delay(10);
+    }
+  }
+  return "NO";
 }
 
 void commandSelectMonth(String command) {
@@ -685,14 +855,32 @@ int checkEvents(String YYYYMMDD, bool countOnly = false) {
         }
       }
 
-      // YEARLY Apr22
+      // YEARLY APR22 or YEARLY 2SU APR
       if (repeatCode.startsWith("YEARLY ")) {
         String yearlyCode = repeatCode.substring(7);
         yearlyCode.toUpperCase();
+        
+        // Check for static date (e.g. APR22)
         if (yearlyCode == dateCode) {
           if (!countOnly) dayEvents.push_back(calendarEvents[i]);
           eventCount++;
           continue;
+        }
+        
+        // Check for ordinal date (e.g. 2SU APR)
+        if (yearlyCode.length() >= 6 && isDigit(yearlyCode[0])) {
+          int nth = yearlyCode.charAt(0) - '0';
+          String codeWeekday = yearlyCode.substring(1, 3);
+          String codeMonth = yearlyCode.substring(4, 7);
+          
+          String currentMonthUpper = monthName;
+          currentMonthUpper.toUpperCase();
+          
+          if (nth == nthWeekday && codeWeekday == weekdayUpper && codeMonth == currentMonthUpper) {
+            if (!countOnly) dayEvents.push_back(calendarEvents[i]);
+            eventCount++;
+            continue;
+          }
         }
       }
     }
@@ -881,7 +1069,7 @@ void drawCalendarWeek(int weekOffset) {
   }
 }
 
-// Loops
+#pragma region Loops
 void processKB_CALENDAR() {
   int currentMillis = millis();
   DateTime now = CLOCK().nowDT();
@@ -1041,21 +1229,15 @@ void processKB_CALENDAR() {
         newEventState++; newState = true; delay(50);
       }
       else if (newEventState == 4) {
-        KB().setKeyboardState(NORMAL);
-        while (true) {
-          String code = textPrompt("Repeat (NO, DAILY, WEEKLY XX...):");
-          if (code == "_RETURN_") return;
-          else if (code == "_EXIT_") { CurrentCalendarState = MONTH; newState = true; break; }
-          
-          code.toUpperCase();
-          if (code == "NO" || code == "DAILY" || code.startsWith("WEEKLY ") || 
-              code.startsWith("MONTHLY ") || code.startsWith("YEARLY ")) {
-            newEventRepeat = code;
-            newEventState++; newState = true; delay(50);
-            break;
-          } else {
-            OLED().sysMessage("Invalid Repeat Code",1000);
-          }
+        String code = repeatPrompt(newEventStartDate);
+        if (code == "_EXIT_") { 
+          CurrentCalendarState = MONTH; 
+          newState = true; 
+        } else {
+          newEventRepeat = code;
+          newEventState++; 
+          newState = true; 
+          delay(50);
         }
       }
       else if (newEventState == 5) {
@@ -1118,17 +1300,10 @@ void processKB_CALENDAR() {
             newState = true;
           }
           else if (inchar == '5') {
-            String code = textPrompt("Edit Repeat (NO, DAILY...):");
-            if (code == "_RETURN_") return;
-            else if (code != "_EXIT_") {
-              code.toUpperCase();
-              if (code == "NO" || code == "DAILY" || code.startsWith("WEEKLY ") || 
-                  code.startsWith("MONTHLY ") || code.startsWith("YEARLY ")) {
-                newEventRepeat = code;
-                newState = true;
-              } else {
-                OLED().sysMessage("Invalid Repeat Code",1000);
-              }
+            String code = repeatPrompt(newEventStartDate);
+            if (code != "_EXIT_") {
+              newEventRepeat = code;
+              newState = true;
             }
           }
           else if (inchar == '6') {
