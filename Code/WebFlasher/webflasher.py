@@ -57,6 +57,10 @@ class FirmwareReleaseManager:
         release_dirs = [d for d in release_dirs if not self.is_dev_version(d)]
         
         for release in release_dirs:
+            if release == current_version:
+                print(f"  Skipping preservation of {release} (current build)")
+                continue
+                
             print(f"  Preserving release: {release}")
             src = gh_firmware / release
             dst = self.firmware_dir / release

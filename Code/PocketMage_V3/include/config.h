@@ -58,6 +58,7 @@
 #define SD_D0         13
 #define SD_D1         5
 #define SD_D2         6
+#define SD_D3         10
 
 // SDSPI mode
 #define SD_CS         10
