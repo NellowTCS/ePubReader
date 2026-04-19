@@ -1,10 +1,3 @@
-// ooooooooooooo       .o.        .oooooo..o oooo    oooo  .oooooo..o   //
-// 8'   888   `8      .888.      d8P'    `Y8 `888   .8P'  d8P'    `Y8   //
-//      888          .8"888.     Y88bo.       888  d8'    Y88bo.        //
-//      888         .8' `888.     `"Y8888o.   88888[       `"Y8888o.    //
-//      888        .88ooo8888.         `"Y88b  888`88b.         `"Y88b  //
-//      888       .8'     `888.  oo     .d8P  888  `88b.  oo     .d8P   //
-//     o888o     o88o      o8888o 8""88888P'  o888o  o888o 8""88888P'   //  
 // AUDIT 1
 
 #include <globals.h>
@@ -429,12 +422,12 @@ String repeatPrompt(String startDateStr) {
       }
 
       if (sel == 1) { // Ordinal pill selected
-        u8g2.drawRBox(151, 10, 106, 22, 8);
+        u8g2.drawRBox(151, 10, 105, 22, 8);
         u8g2.setDrawColor(0);
         u8g2.drawStr(ordX, 26, ordStr.c_str());
         u8g2.setDrawColor(1);
       } else {
-        u8g2.drawRFrame(151, 10, 106, 22, 8);
+        u8g2.drawRFrame(151, 10, 105, 22, 8);
         u8g2.drawStr(ordX, 26, ordStr.c_str());
       }
       u8g2.sendBuffer();
