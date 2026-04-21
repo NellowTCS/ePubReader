@@ -3,11 +3,6 @@ static constexpr const char* TAG = "UTILS";
 
 static uint8_t prevSec = 0;
 
-// DRY helper for battery math to prevent duplicated magic numbers
-inline float getBatteryVoltage() {
-  return (analogRead(BAT_SENS) * (3.3 / 4095.0) * 2) + 0.2;
-}
-
 void printDebug() {
   DateTime now = CLOCK().nowDT();
   if (now.second() != prevSec) {
