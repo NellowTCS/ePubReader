@@ -866,18 +866,19 @@ char PocketmageKB::updateKeypress() {
                     u8g2.sendBuffer();
 
                     // --- APP SWITCHER HOOK ---
-                    if (activeCycleLen == 11 && CurrentAppState != USB_APP) { // cyc_appSwitch trigger length
+                    if (activeCycleLen == 12 && CurrentAppState != USB_APP) { // cyc_appSwitch trigger length
 #if !OTA_APP_FLAG
                         if (cycleIndex == 1) TXT_INIT("");
                         else if (cycleIndex == 2) FILEWIZ_INIT();
                         else if (cycleIndex == 3) USB_INIT();
-                        else if (cycleIndex == 4) SETTINGS_INIT();
-                        else if (cycleIndex == 5) TASKS_INIT();
-                        else if (cycleIndex == 6) CALENDAR_INIT();
-                        else if (cycleIndex == 7) JOURNAL_INIT();
-                        else if (cycleIndex == 8) LEXICON_INIT();
-                        else if (cycleIndex == 9) TERMINAL_INIT();
-                        else if (cycleIndex == 10) APPLOADER_INIT();
+                        else if (cycleIndex == 4) COMM_INIT();
+                        else if (cycleIndex == 5) SETTINGS_INIT();
+                        else if (cycleIndex == 6) TASKS_INIT();
+                        else if (cycleIndex == 7) CALENDAR_INIT();
+                        else if (cycleIndex == 8) JOURNAL_INIT();
+                        else if (cycleIndex == 9) LEXICON_INIT();
+                        else if (cycleIndex == 10) TERMINAL_INIT();
+                        else if (cycleIndex == 11) APPLOADER_INIT();
 #endif
                         // If 0 ("cancel"), do nothing.
                         if (cycleIndex == 0) return 0;
@@ -922,8 +923,8 @@ char PocketmageKB::updateKeypress() {
                   static const char* cyc_C[] = {"C", "Ç"};
                   
                   // App Switcher Arrays
-                  static const char* cyc_appSwitch[] = {" ", "N", "F", "U", "S", "T", "C", "J", "D", "P", "L"};
-                  static const char* appSwitchNames[] = {"cancel", "txt", "filewiz", "USB", "settings", "tasks", "calendar", "journal", "lexicon", "terminal", "app loader"};
+                  static const char* cyc_appSwitch[] = {" ", "N", "F", "U", "M", "S", "T", "C", "J", "D", "P", "L"};
+                  static const char* appSwitchNames[] = {"cancel", "txt", "filewiz", "USB", "chat", "settings", "tasks", "calendar", "journal", "lexicon", "terminal", "app loader"};
 
                   bool matched = true;
                   if (nestedBaseC == 'a') { activeCycle = cyc_a; activeCycleLen = 8; }
@@ -940,7 +941,7 @@ char PocketmageKB::updateKeypress() {
                   else if (nestedBaseC == 'N') { activeCycle = cyc_N; activeCycleLen = 2; }
                   else if (nestedBaseC == 'c') { activeCycle = cyc_c; activeCycleLen = 2; }
                   else if (nestedBaseC == 'C') { activeCycle = cyc_C; activeCycleLen = 2; }
-                  else if (nestedBaseC == 20 || nestedBaseC == 7)  { activeCycle = cyc_appSwitch; activeCycleLen = 11; }
+                  else if (nestedBaseC == 20 || nestedBaseC == 7)  { activeCycle = cyc_appSwitch; activeCycleLen = 12; }
                   else matched = false;
 
                   if (matched) {
