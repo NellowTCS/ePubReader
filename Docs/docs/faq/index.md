@@ -87,7 +87,7 @@ You can use any microSD card up to 32gb. **8gb is recommended** since PocketMage
 
 ### **Where are the CAD files?**
 
-Currently CAD files are available only to Beta Testers. These files will be released to the public alongside the release of the final production PocketMage. If you are a Beta Tester, you can find the password-protected .zip file [here](https://github.com/ashtf8/PocketMage_PDA/tree/main/Docs/CAD) and the password in the beta Discord channel.
+Currently CAD files are available only to Beta Testers. These files will be released to the public alongside the release of the final production PocketMage. If you are a Beta Tester, you can find the password-protected .zip file [here](https://github.com/ashtf8/PocketMage_PDA/tree/main/Resources/CAD) and the password in the beta Discord channel.
 
 ### **Where can I get an extra battery?**
 
@@ -103,7 +103,7 @@ The programming mode switch allows you to program and debug the PocketMage. Inte
 
 ### **My dictionary isn't working!**
 
-The English dictionary isn't installed on the PocketMage out of the box and needs to be downloaded to the SD card. Find the dictionary files [here.](<https://github.com/ashtf8/PocketMage_PDA/tree/main/Docs/Dictionary%20(OPTED)>) Simply connect your PocketMage to your computer using the USB app and drop all the .txt files into the dictionary folder!
+The English dictionary isn't installed on the PocketMage out of the box and needs to be downloaded to the SD card. Find the dictionary files [here.](<https://github.com/ashtf8/PocketMage_PDA/tree/main/Resources/Assets/Dictionary%20(OPTED)>) Simply connect your PocketMage to your computer using the USB app and drop all the .txt files into the dictionary folder!
 
 ### **I can't flash the firmware!**
 
