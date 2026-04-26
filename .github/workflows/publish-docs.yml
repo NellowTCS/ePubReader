@@ -21,7 +21,7 @@ jobs:
       # Build core library
       - name: Build Docs
         run: |
-          cd ../Docs
+          cd Docs
           npm ci
           npm run build
           cd ../
