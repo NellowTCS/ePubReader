@@ -47,6 +47,8 @@ TERMINAL_functions CurrentTERMfunc = PROMPT;
 // Terminal
 static std::vector<String> terminalOutputs;
 static String currentDir = "/";
+static String terminalCommand = "";
+static ulong termScrollIndex = 0;
 
 // Potion
 static String editFile = "";
@@ -235,31 +237,45 @@ void updateTerminalDisp() {
   newState = false;
   display.fillRect(0, 0, display.width(), display.height(), GxEPD_BLACK);
 
-  if (terminalOutputs.size() < 14) {
-    int y = 14;
-    for (const String& s : terminalOutputs) {
-      display.setTextColor(GxEPD_WHITE);
-      display.setFont(&FreeMonoBold9pt7b);
-      display.setCursor(5, y);
-      printUTF8ToEink(s);
-      y += 16;
-    }
-  } else {
-    int y = display.height() - 5;
-    for (int i = terminalOutputs.size() - 1; i >= 0; i--) {
-      if (y < 0)
-        break;
-      const String& s = terminalOutputs[i];
-      display.setTextColor(GxEPD_WHITE);
-      display.setFont(&FreeMonoBold9pt7b);
-      display.setCursor(5, y);
-      printUTF8ToEink(s);
-      y -= 16;
+  int maxScroll = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
+  
+  // Safely clamp bounds (Removed the < 0 check)
+  if (termScrollIndex > (ulong)maxScroll) termScrollIndex = maxScroll;
 
-      display.setTextColor(GxEPD_BLACK);
-    }
+  int y = 14;
+  int startIdx = termScrollIndex;
+  int endIdx = startIdx + 14;
+  if (endIdx > terminalOutputs.size()) endIdx = terminalOutputs.size();
+
+  for (int i = startIdx; i < endIdx; i++) {
+    const String& s = terminalOutputs[i];
+    display.setTextColor(GxEPD_WHITE);
+    display.setFont(&FreeMonoBold9pt7b);
+    display.setCursor(5, y);
+    printUTF8ToEink(s);
+    y += 16;
   }
 
+  // Draw Terminal Scrollbar
+  if (maxScroll > 0) {
+    int barWidth = 4;
+    int barX = display.width() - barWidth;
+    
+    // Draw Track Line
+    display.drawFastVLine(barX + (barWidth / 2), 0, display.height(), GxEPD_WHITE);
+    
+    // Calculate Handle Height and Position
+    float visibleRatio = 14.0 / terminalOutputs.size();
+    int handleHeight = max((int)(display.height() * visibleRatio), 15);
+    
+    float scrollFraction = (float)termScrollIndex / maxScroll;
+    int handleY = scrollFraction * (display.height() - handleHeight);
+    
+    // Draw Handle Block
+    display.fillRect(barX, handleY, barWidth, handleHeight, GxEPD_WHITE);
+  }
+
+  display.setTextColor(GxEPD_BLACK);
   EINK().refresh();
 }
 
@@ -305,6 +321,7 @@ void funcSelect(String command) {
   // Clear command window
   if (command == "clear") {
     terminalOutputs.clear();
+    termScrollIndex = 0;
     newState = true;
     return;
   }
@@ -332,6 +349,7 @@ void funcSelect(String command) {
     terminalOutputs.push_back("pot link <file> <alias>");
     terminalOutputs.push_back("pot unlink <alias>");
 
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -376,6 +394,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -430,6 +449,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -464,6 +484,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -502,6 +523,7 @@ void funcSelect(String command) {
       OLED().sysMessage(returnText,1000);
     }
 
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -547,6 +569,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -600,6 +623,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -658,6 +682,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -697,6 +722,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -747,6 +773,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -790,6 +817,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText, 1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -814,6 +842,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText, 1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -875,6 +904,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -922,6 +952,7 @@ void funcSelect(String command) {
           }
 
           pocketmage::setCpuSpeed(POWER_SAVE_FREQ);
+          termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
           return;
         }
       }
@@ -933,6 +964,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText,1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -953,6 +985,7 @@ void funcSelect(String command) {
         returnText = "Failed to read linked file";
       }
       pocketmage::setCpuSpeed(POWER_SAVE_FREQ);
+      termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
       return;
     }
 
@@ -961,6 +994,7 @@ void funcSelect(String command) {
       terminalOutputs.push_back(returnText);
       OLED().sysMessage(returnText, 1000);
     }
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -969,6 +1003,7 @@ void funcSelect(String command) {
   returnText = commandSelect(command);
   if (returnText != "") {
     terminalOutputs.push_back(returnText);
+    termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
     newState = true;
     return;
   }
@@ -990,6 +1025,7 @@ void wr_print(WRContext* c, const WRValue* argv, int argn, WRValue& ret, void* u
   const char* s = argv[0].asString(buf, 1024);
 
   terminalOutputs.push_back(s);
+  termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
 }
 
 void wr_prompt(WRContext* c, const WRValue* argv, int argn, WRValue& ret, void* usr) {
@@ -1388,6 +1424,7 @@ void compileWrench(const char* wrenchCode) {
 
   wr_destroyState(w);
 
+  termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
   newState = true;
 }
 
@@ -1395,7 +1432,10 @@ void compileWrench(const char* wrenchCode) {
 void TERMINAL_INIT() {
   CurrentAppState = TERMINAL;
   CurrentTERMfunc = PROMPT;
+  potionLines.clear();
   potionLines.push_back("");
+  terminalCommand = "";
+  termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
   KB().setKeyboardState(NORMAL);
   if (!potLinksLoaded) loadPotLinks();
   newState = true;
@@ -1412,14 +1452,70 @@ void processKB_TERMINAL() {
 
   switch (CurrentTERMfunc) {
     case PROMPT:
-      KB().setKeyboardState(NORMAL);
-      command = textPrompt("", currentDir + ">");
-      if (command == "_RETURN_") return;
-      else if (command != "_EXIT_") {
-        funcSelect(command);
-      } else
-        HOME_INIT();
+    {
+      pocketmage::setCpuSpeed(240);
+      char inchar = KB().updateKeypress();
+      if (inchar == 0) pocketmage::setCpuSpeed(POWER_SAVE_FREQ);
+
+      int maxScroll = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
+
+      // Handle Terminal Hardware Scrolling
+      if (TOUCH().updateScroll(maxScroll, termScrollIndex)) {
+        newState = true;
+      }
+
+      if (currentMillis - KBBounceMillis >= KB_COOLDOWN) {
+        if (inchar != 0) {
+          lastInput = millis();
+          KBBounceMillis = currentMillis;
+
+          // Make typing jump to the newest line
+          if (termScrollIndex != maxScroll) {
+            termScrollIndex = maxScroll;
+            newState = true;
+          }
+
+          if (inchar == 13) { // CR
+            funcSelect(terminalCommand);
+            terminalCommand = "";
+            termScrollIndex = terminalOutputs.size() > 14 ? terminalOutputs.size() - 14 : 0;
+            KB().setKeyboardState(NORMAL);
+            newState = true;
+          }
+          else if (inchar == 17) { // SHIFT
+            if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
+            else if (KB().getKeyboardState() == FUNC) KB().setKeyboardState(FN_SHIFT);
+            else KB().setKeyboardState(SHIFT);
+          }
+          else if (inchar == 18) { // FUNC
+            if (KB().getKeyboardState() == FUNC || KB().getKeyboardState() == FN_SHIFT) KB().setKeyboardState(NORMAL);
+            else if (KB().getKeyboardState() == SHIFT) KB().setKeyboardState(FN_SHIFT);
+            else KB().setKeyboardState(FUNC);
+          }
+          else if (inchar == 8) { // BKSP
+            if (terminalCommand.length() > 0) {
+              terminalCommand.remove(terminalCommand.length() - 1);
+            }
+          }
+          else if (inchar == 12) { // FN+LEFT (Escape/Home)
+            HOME_INIT();
+            break;
+          }
+          else if (inchar >= 32 && inchar <= 126) {
+            terminalCommand += inchar;
+            if (inchar >= 48 && inchar <= 57) {} // keep FN on for numbers
+            else if (KB().getKeyboardState() != NORMAL) KB().setKeyboardState(NORMAL);
+          }
+        }
+      }
+
+      currentMillis = millis();
+      if (currentMillis - OLEDFPSMillis >= (1000 / OLED_MAX_FPS)) {
+        OLEDFPSMillis = currentMillis;
+        OLED().oledLine(terminalCommand, terminalCommand.length(), false, currentDir + "> ");
+      }
       break;
+    }
 
     case POTION:
       String left = "";
