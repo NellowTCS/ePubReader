@@ -199,7 +199,9 @@ void initDocMemory() {
   if (doc_ptr == nullptr) {
     #if BOARD_HAS_PSRAM
       doc_ptr = (Document*) ps_malloc(sizeof(Document));
+      ESP_LOGI(TAG, "Allocated document memory in PSRAM");
       if (doc_ptr == nullptr) {
+        ESP_LOGW(TAG, "Fallback to normal RAM");
         doc_ptr = (Document*) malloc(sizeof(Document));
       }
     #else

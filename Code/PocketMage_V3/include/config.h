@@ -12,7 +12,6 @@
 // CONFIGURATION & SETTINGS
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
 #define KB_COOLDOWN 3                           // Keypress cooldown
-#define FULL_REFRESH_AFTER 5                    // Full refresh after N partial refreshes (CHANGE WITH CAUTION)
 #define MAX_FILES 10                            // Number of files to store
 #define FORMAT_SPIFFS_IF_FAILED true            // Format the SPIFFS filesystem if mount fails
 #define SLEEPMODE "TEXT"                        // TEXT, SPLASH, CLOCK
@@ -22,6 +21,13 @@
 #define SYS_METADATA_FILE "/sys/SDMMC_META.txt" // File path to the file system metadata file
 #define POWER_SAVE_FREQ 40                      // CPU freq for power save mode
 #define IDLE_TIME 20000                         // time to wait for mage idle (ms)
+
+// Full refresh after N partial refreshes (CHANGE WITH CAUTION)
+#if POCKETMAGE_HW_VERSION == 2
+  #define FULL_REFRESH_AFTER 10 // Prod uses N=10                    
+#else
+  #define FULL_REFRESH_AFTER 5  // Beta needs N=5
+#endif
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////|
 
 // PIN DEFINITION
@@ -36,6 +42,7 @@
 #define BAT_SENS      4
 #define CHRG_SENS     39
 #define RTC_INT       1 
+#define LOAD_SWITCH   38
 
 // SPI
 #define SPI_MOSI      14

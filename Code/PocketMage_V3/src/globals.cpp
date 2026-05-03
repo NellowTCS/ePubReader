@@ -33,7 +33,7 @@ int OLED_MAX_FPS;                        // OLED max FPS
 bool SD_SPI_COMPATIBILITY;               // SD card compatibility mode
 
 // ===================== APP STATES =====================
-const String appStateNames[] = { "txt", "filewiz", "usb", "bt", "settings", "tasks", "calendar", "journal", "lexicon", "terminal" , "loader" }; // App state names
+const String appStateNames[] = { "txt", "filewiz", "usb", "chat", "settings", "tasks", "calendar", "journal", "lexicon", "terminal" , "loader" }; // App state names
 #if !OTA_APP // POCKETMAGE_OS
 const unsigned char *appIcons[11] = { _homeIcons2, _homeIcons3, _homeIcons4, _homeIcons5, _homeIcons6, taskIconTasks0, _homeIcons7, _homeIcons8, _homeIcons9, _homeIcons11, _homeIcons10}; // App icons
 #endif

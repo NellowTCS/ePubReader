@@ -25,8 +25,9 @@ PocketmageEink& EINK() { return pm_eink; }
 
 // ===================== main functions =====================
 void PocketmageEink::refresh() {
-  // USE A SLOW FULL UPDATE EVERY N FAST UPDATES OR WHEN SPECIFIED
-  if ((partialCounter_ >= fullRefreshAfter_) || forceSlowFullUpdate_) {
+  // Use a slow full update for every N fast refreshes
+  // Forced full refreshes are only needed in the Beta
+  if ((partialCounter_ >= fullRefreshAfter_) || (forceSlowFullUpdate_ && POCKETMAGE_HW_VERSION != 2)) {
     forceSlowFullUpdate_ = false;
     partialCounter_ = 0;
     setFastFullRefresh(false);
@@ -45,18 +46,23 @@ void PocketmageEink::refresh() {
 }
 
 void PocketmageEink::multiPassRefresh(int passes) {
-  display_.display(false);
-  if (passes > 0) {
-    for (int i = 0; i < passes; i++) {
-      delay(250);
-      display_.display(true);
+  // Multi-pass refreshes are only needed in Beta
+  #if POCKETMAGE_HW_VERSION == 2
+    EINK().refresh();
+  #else
+    display_.display(false);
+    if (passes > 0) {
+      for (int i = 0; i < passes; i++) {
+        delay(250);
+        display_.display(true);
+      }
     }
-  }
 
-  delay(100);
-  display_.setFullWindow();
-  display_.fillScreen(GxEPD_WHITE);
-  display_.hibernate();
+    delay(100);
+    display_.setFullWindow();
+    display_.fillScreen(GxEPD_WHITE);
+    display_.hibernate();
+  #endif
 }
 
 void PocketmageEink::setFastFullRefresh(bool setting) {

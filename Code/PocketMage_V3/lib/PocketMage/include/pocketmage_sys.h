@@ -39,3 +39,4 @@ int stringToInt(String str);
 extern volatile bool newLineAdded;           // New line added in TXT
 extern std::vector<String> allLines;                // All lines in TXT
 extern bool noTimeout;               // Disable timeout
+extern void setLoadSwitch(bool state);

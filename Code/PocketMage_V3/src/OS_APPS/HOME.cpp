@@ -159,6 +159,9 @@ String commandSelect(String command) {
   else if (command == "journ" || command == "journal" || command == "daily" || command == "8") {
     JOURNAL_INIT();
   }
+  else if (command == "chat" || command == "msg") {
+    COMM_INIT();
+  }
   else if (command == "version" || command == "ver") {
     OLED().sysMessage("PMOS: " + String(OS_VERSION_STR),2000);   
   }

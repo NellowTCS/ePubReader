@@ -55,6 +55,9 @@ void applicationEinkHandler() {
     case TERMINAL:
       einkHandler_TERMINAL();
       break;
+    case COMM:
+      einkHandler_COMM();
+      break;
     // ADD APP CASES HERE
     default:
       einkHandler_HOME();
@@ -133,6 +136,9 @@ void processKB() {
       break;
     case TERMINAL:
       processKB_TERMINAL();
+      break;
+    case COMM:
+      processKB_COMM();
       break;
     // ADD APP CASES HERE
     default:
