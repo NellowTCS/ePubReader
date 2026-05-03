@@ -50,6 +50,7 @@ static String terminalCommand = "";
 static ulong termScrollIndex = 0;
 static bool termLargeFont = true;
 static int termLinesPerPage = 14;
+static int termMaxLineLen = 28;
 static bool termDarkTheme = true;
 
 // Potion
@@ -338,8 +339,8 @@ void funcSelect(String command) {
   String returnText = "";
 
   String totalMsg = currentDir + ">" + command;
-  if (totalMsg.length() > 28)
-    totalMsg = totalMsg.substring(0, 28);
+  if (totalMsg.length() > termMaxLineLen)
+    totalMsg = totalMsg.substring(0, termMaxLineLen);
   terminalOutputs.push_back(totalMsg);
 
   command.toLowerCase();
@@ -456,8 +457,8 @@ void funcSelect(String command) {
             lineOutput += " * ";
             lineOutput += String(file.size()) + "b";
           }
-          if (lineOutput.length() > 28)
-            lineOutput = lineOutput.substring(0, 28);
+          if (lineOutput.length() > termMaxLineLen)
+            lineOutput = lineOutput.substring(0, termMaxLineLen);
           terminalOutputs.push_back(lineOutput);
 
           lineOutput = "";
@@ -986,10 +987,12 @@ void funcSelect(String command) {
     if (arg == "l") {
       termLargeFont = true;
       termLinesPerPage = 14;
+      termMaxLineLen = 28;
       returnText = "Font set to Large";
     } else if (arg == "s") {
       termLargeFont = false;
       termLinesPerPage = 23; 
+      termMaxLineLen = 52;
       returnText = "Font set to Small";
     } else {
       returnText = "Usage: setfont <l/s>";
@@ -1478,7 +1481,7 @@ void compileWrench(const char* wrenchCode) {
           len--;
         }
 
-        int outLen = (len > 29) ? 29 : len;
+        int outLen = (len > termMaxLineLen) ? termMaxLineLen : len;
         terminalOutputs.push_back(String(lineStart).substring(0, outLen));
 
         lineStart = p + 1;
@@ -1488,7 +1491,7 @@ void compileWrench(const char* wrenchCode) {
 
     if (lineStart != p) {
       int len = p - lineStart;
-      int outLen = (len > 29) ? 29 : len;
+      int outLen = (len > termMaxLineLen) ? termMaxLineLen : len;
       terminalOutputs.push_back(String(lineStart).substring(0, outLen));
     }
   }
