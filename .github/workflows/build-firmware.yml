@@ -25,12 +25,14 @@ jobs:
         with:
           ref: ${{ github.event.release.tag_name }}
           fetch-depth: 0
+          submodules: recursive
 
       - name: Checkout main
         if: ${{ github.event_name != 'release' }}
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
       - name: Prepare the Python Cauldron
         uses: actions/setup-python@v5
