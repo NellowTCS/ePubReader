@@ -1,0 +1,12 @@
+.pio/
+.pioenvs/
+.piolibdeps/
+lib/lexepub_c/xtensa-esp32s3-espidf/
+lib/lexepub_c/lib/
+*.o
+*.a
+*.bin
+sdkconfig
+sdkconfig.old
+release/
+build/
