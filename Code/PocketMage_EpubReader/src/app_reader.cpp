@@ -7,7 +7,8 @@
 using namespace capi;
 
 static EpubExtractor* s_epub = nullptr;
-static char*          s_chapterJson = nullptr;
+static char*          s_chapterText = nullptr;
+static size_t         s_chapterTextCap = 0;
 
 // TOC JSON parser helpers
 static const char* skip_ws(const char* p) {
@@ -156,7 +157,7 @@ void open_book(const char* filename) {
     g_needsRedraw = true;
 }
 
-    // Load a chapter
+    // Load a chapter using streaming text API
 void reader_load_chapter(uint16_t chapter) {
     Serial.printf("[load_chapter] chapter=%u g_chapterCount=%u s_epub=%p\n", chapter, g_chapterCount, s_epub);
     if (chapter >= g_chapterCount) {
@@ -167,24 +168,53 @@ void reader_load_chapter(uint16_t chapter) {
 
     g_curChapter = chapter;
 
-    // Allocate chapter JSON buffer on first use (heap)
-    if (!s_chapterJson) {
-        Serial.printf("[load_chapter] allocating 32768 for chapterJson\n");
-        s_chapterJson = (char*)malloc(32768);
-        if (!s_chapterJson) { Serial.printf("[load_chapter] MALLOC FAILED\n"); return; }
-        Serial.printf("[load_chapter] malloc OK ptr=%p\n", s_chapterJson);
+    // Open formatting-aware streaming reader
+    ChapterFormattingStream* stream = EpubExtractor_open_chapter_formatting_stream(s_epub, chapter);
+    if (!stream) {
+        // Fall back to plain-text stream
+        Serial.printf("[load_chapter] FORMATTING STREAM FAILED, falling back to text\n");
+        ChapterTextStream* textStream = EpubExtractor_open_chapter_text_stream(s_epub, chapter);
+        if (!textStream) {
+            Serial.printf("[load_chapter] TEXT STREAM ALSO FAILED\n");
+            return;
+        }
+        size_t cap = 4096;
+        size_t len = 0;
+        if (!s_chapterText || s_chapterTextCap < cap) {
+            if (s_chapterText) free(s_chapterText);
+            s_chapterText = (char*)malloc(cap);
+            if (!s_chapterText) {
+                Serial.printf("[load_chapter] MALLOC FAILED for text buffer\n");
+                ChapterTextStream_destroy(textStream);
+                return;
+            }
+            s_chapterTextCap = cap;
+        }
+        char chunk[1025];
+        DiplomatWriteable cw = diplomat_simple_write(chunk, 1024);
+        while (ChapterTextStream_read_chunk(textStream, &cw)) {
+            size_t chunkLen = cw.len;
+            if (chunkLen == 0) { cw = diplomat_simple_write(chunk, 1024); continue; }
+            if (len + chunkLen + 1 > s_chapterTextCap) {
+                size_t newCap = s_chapterTextCap * 2;
+                if (newCap < len + chunkLen + 1) newCap = len + chunkLen + 1;
+                char* newBuf = (char*)realloc(s_chapterText, newCap);
+                if (!newBuf) { Serial.printf("[load_chapter] REALLOC FAILED\n"); break; }
+                s_chapterText = newBuf;
+                s_chapterTextCap = newCap;
+            }
+            memcpy(s_chapterText + len, chunk, chunkLen);
+            len += chunkLen;
+            cw = diplomat_simple_write(chunk, 1024);
+        }
+        ChapterTextStream_destroy(textStream);
+        if (len == 0) return;
+        s_chapterText[len] = '\0';
+        render_chapter_text(s_chapterText, len);
+    } else {
+        render_chapter_formatted(stream);
+        ChapterFormattingStream_destroy(stream);
     }
-
-    DiplomatWriteable cw = diplomat_simple_write(s_chapterJson, 32767);
-    Serial.printf("[load_chapter] calling get_single_chapter_json(%u)...\n", chapter);
-    auto result = EpubExtractor_get_single_chapter_json(s_epub, chapter, &cw);
-    Serial.printf("[load_chapter] get_single_chapter_json done is_ok=%d len=%u\n", (int)result.is_ok, cw.len);
-    if (!result.is_ok) { Serial.printf("[load_chapter] GET SINGLE CHAPTER JSON FAILED\n"); return; }
-
-    s_chapterJson[cw.len] = '\0';
-    Serial.printf("[load_chapter] calling render_chapter (json_len=%u)\n", cw.len);
-    render_chapter(s_chapterJson);
-    Serial.printf("[load_chapter] render_chapter done g_pagesInChapter=%u\n", g_pagesInChapter);
 
     if (g_curPage >= g_pagesInChapter) g_curPage = 0;
     Serial.printf("[load_chapter] complete\n");

@@ -10,3 +10,4 @@ sdkconfig
 sdkconfig.old
 release/
 build/
+.DS_Store

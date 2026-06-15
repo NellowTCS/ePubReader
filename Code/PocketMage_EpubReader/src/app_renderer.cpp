@@ -10,6 +10,8 @@
 #include <Fonts/FreeSerifBold18pt8b.h>
 #include <Fonts/FreeMonoBold9pt8b.h>
 #include "reader.h"
+#include "EpubExtractor.h"
+using namespace capi;
 
 // Display constants
 static constexpr int16_t MARGIN_X = 8;
@@ -223,12 +225,10 @@ static void layout_runs(StyledRun* runs, int runCount) {
         String txt(run->text, run->len);
         display.getTextBounds(txt.c_str(), 0, 0, &x1, &y1, &w, &h);
 
-        int16_t startX = MARGIN_X + run->indent;
         int16_t avail  = USABLE_W - run->indent;
-        if (w > (uint16_t)avail && line.runCount > 0) {
-            // Word wrap
+        if (line.runCount > 0 && line.consumedX + w > avail) {
             flushLine();
-            if (run->indent > line.indent) line.indent = run->indent;
+            line.indent = run->indent;
         } else if (line.runCount == 0) {
             line.indent = run->indent;
         }
@@ -244,7 +244,144 @@ static void layout_runs(StyledRun* runs, int runCount) {
     if (s_pageCount < 32 && s_pages[s_pageCount].lineCount > 0) s_pageCount++;
 }
 
-// Public render API
+// Public render API, text-only path (no JSON, no ArduinoJson)
+void render_chapter_text(const char* text, size_t text_len) {
+    Serial.printf("[render_chapter_text] len=%u\n", text_len);
+    g_pagesInChapter = 0;
+    g_pageCount = 0;
+
+    // Allocate run array + text pool (heap, freed by the next call)
+    static StyledRun* s_runs = nullptr;
+    static char*      s_pool = nullptr;
+    if (s_runs) free(s_runs);
+    if (s_pool) free(s_pool);
+    s_runs = (StyledRun*)malloc(1024 * sizeof(StyledRun));
+    s_pool = (char*)malloc(text_len + 1);
+    if (!s_runs || !s_pool) {
+        Serial.printf("[render_chapter_text] MALLOC FAILED\n");
+        g_pagesInChapter = 0; g_pageCount = 1; return;
+    }
+
+    // Copy text into pool, split into runs by line
+    memcpy(s_pool, text, text_len);
+    s_pool[text_len] = '\0';
+
+    int runCount = 0;
+    char* p = s_pool;
+    char* end = s_pool + text_len;
+
+    while (p < end && runCount < 1024) {
+        char* line_end = p;
+        while (line_end < end && *line_end != '\n') line_end++;
+        // Trim trailing whitespace within the pool
+        char* trim = line_end;
+        while (trim > p && (trim[-1] == ' ' || trim[-1] == '\t')) trim--;
+        size_t line_len = trim - p;
+
+        // Detect headings: short line ending with no punctuation, followed
+        // by a blank line
+        uint8_t heading = 0;
+        if (line_len > 0 && line_len < 60) {
+            // Single-line short text likely a heading
+            heading = 1;
+        }
+
+        if (line_len > 0) {
+            s_runs[runCount].text    = p;
+            s_runs[runCount].len     = line_len;
+            s_runs[runCount].font    = 0;
+            s_runs[runCount].heading = heading;
+            s_runs[runCount].flags   = 0;
+            s_runs[runCount].indent  = 0;
+            runCount++;
+        }
+        p = line_end + 1;
+    }
+
+    Serial.printf("[render_chapter_text] %d runs\n", runCount);
+    layout_runs(s_runs, runCount);
+
+    g_pages     = s_pages;
+    g_pageCount = (uint16_t)s_pageCount;
+    g_pagesInChapter = g_pageCount;
+    if (g_pageCount == 0) g_pageCount = 1;
+    Serial.printf("[render_chapter_text] done pages=%u\n", g_pageCount);
+}
+
+// Formatting-aware renderer using ChapterFormattingStream.
+void render_chapter_formatted(ChapterFormattingStream* stream) {
+    Serial.printf("[render_chapter_formatted] stream=%p\n", stream);
+    g_pagesInChapter = 0;
+    g_pageCount = 0;
+
+    // Allocate run array + text pool (heap, freed by the next call)
+    static StyledRun* s_runs = nullptr;
+    static char*      s_pool = nullptr;
+    if (s_runs) free(s_runs);
+    if (s_pool) free(s_pool);
+    s_runs = (StyledRun*)malloc(1024 * sizeof(StyledRun));
+    s_pool = (char*)malloc(24576);
+    if (!s_runs || !s_pool) {
+        Serial.printf("[render_chapter_formatted] MALLOC FAILED\n");
+        g_pagesInChapter = 0; g_pageCount = 1; return;
+    }
+
+    int runCount = 0;
+    size_t poolUsed = 0;
+
+    char textBuf[1024];
+
+    while (ChapterFormattingStream_next_run(stream) && runCount < 1024) {
+        uint8_t style   = ChapterFormattingStream_run_style(stream);
+        uint8_t heading = ChapterFormattingStream_run_heading(stream);
+
+        DiplomatWriteable w = diplomat_simple_write(textBuf, 1024);
+        diplomat_result_void_void res = ChapterFormattingStream_run_text(stream, &w);
+        if (!res.is_ok) break;
+        size_t textLen = w.len;
+        if (textLen == 0) continue;
+
+        // Copy text into pool
+        if (poolUsed + textLen + 1 > 24576) break;  // pool full
+        memcpy(s_pool + poolUsed, textBuf, textLen);
+        s_pool[poolUsed + textLen] = '\0';
+
+        // Fill StyledRun
+        StyledRun* run = &s_runs[runCount];
+        run->text    = s_pool + poolUsed;
+        run->len     = textLen;
+        run->heading = heading;
+        run->flags   = (style & 16) ? 1 : 0;  // bit 4 = code
+        run->indent  = 0;
+
+        // Map style to font:
+        //   font 0 = body, 1 = bold, 2 = italic, 3 = bold-italic
+        uint8_t bold   = (style & 1) ? 1 : 0;   // STYLE_BOLD
+        uint8_t italic = (style & 2) ? 1 : 0;   // STYLE_ITALIC
+        run->font = bold ? (italic ? 3 : 1) : (italic ? 2 : 0);
+
+        poolUsed += textLen + 1;
+        runCount++;
+    }
+
+    Serial.printf("[render_chapter_formatted] %d runs, poolUsed=%u\n", runCount, poolUsed);
+
+    if (runCount == 0) {
+        free(s_runs); s_runs = nullptr;
+        free(s_pool); s_pool = nullptr;
+        g_pagesInChapter = 0; g_pageCount = 1; return;
+    }
+
+    layout_runs(s_runs, runCount);
+
+    g_pages     = s_pages;
+    g_pageCount = (uint16_t)s_pageCount;
+    g_pagesInChapter = g_pageCount;
+    if (g_pageCount == 0) g_pageCount = 1;
+    Serial.printf("[render_chapter_formatted] done pages=%u\n", g_pageCount);
+}
+
+// Old JSON-based renderer (kept for reference, unused by default)
 void render_chapter(const char* json) {
     Serial.printf("[render_chapter] json len=%u\n", strlen(json));
     g_pagesInChapter = 0;
@@ -362,6 +499,37 @@ void render_page_to_eink(uint16_t pageIdx) {
             // Heading underline
             if (run->heading > 0 && ri == ll->runCount - 1) {
                 display.drawFastHLine(MARGIN_X, y + 2, USABLE_W, GxEPD_BLACK);
+            }
+
+            // Clip to usable area to prevent framebuffer wraparound
+            int16_t rightEdge = MARGIN_X + USABLE_W;
+            if (x + (int16_t)tw > rightEdge) {
+                int16_t clipW = rightEdge - x;
+                if (clipW > 0) {
+                    // Binary search for longest prefix that fits
+                    char clipped[256];
+                    int lo = 0, hi = min((int)run->len, 255);
+                    while (lo < hi) {
+                        int mid = (lo + hi + 1) / 2;
+                        memcpy(clipped, run->text, mid);
+                        clipped[mid] = '\0';
+                        uint16_t cw;
+                        display.getTextBounds(clipped, 0, 0, &tx, &ty, &cw, &th);
+                        if ((int16_t)cw <= clipW) lo = mid;
+                        else hi = mid - 1;
+                    }
+                    if (lo > 0) {
+                        memcpy(clipped, run->text, lo);
+                        clipped[lo] = '\0';
+                        display.setCursor(x, y);
+                        display.print(clipped);
+                        uint16_t cw;
+                        display.getTextBounds(clipped, 0, 0, &tx, &ty, &cw, &th);
+                        x += cw;
+                    }
+                    if (run->flags & 1) display.setTextColor(GxEPD_BLACK);
+                    continue;
+                }
             }
 
             display.setCursor(x, y);

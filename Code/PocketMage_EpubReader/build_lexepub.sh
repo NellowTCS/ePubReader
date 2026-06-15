@@ -1,88 +1,81 @@
 #!/bin/bash
+# Build lexepub Rust crate into a C-compatible static library for the ESP32-S3.
+#
+# Prerequisites:
+#   - espup installed and the Xtensa ESP target toolchain sourced
+#     (run: source "$HOME/export-esp.sh")
+#   - Rust with the esp toolchain (rustup toolchain install esp)
+#
+# Usage:
+#   ./build_lexepub.sh                        # release build
+#   ./build_lexepub.sh debug                  # debug build
+#   OUTDIR=/custom/path ./build_lexepub.sh    # override output dir
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LEXEPUB_DIR="$(cd "$SCRIPT_DIR/../PocketMage_V3_EpubReader/third_party/lexepub" && pwd)"
-LIB_DIR="$SCRIPT_DIR/lib/lexepub_c"
-REL_DIR="$LIB_DIR/xtensa-esp32s3-espidf/release"
+: "${LEXEPUB_DIR:="$SCRIPT_DIR/third_party/lexepub/lexepub"}"
+: "${OUTDIR:="$SCRIPT_DIR/lib/lexepub_c/xtensa-esp32s3-espidf"}"
 
-detect_esp_toolchain() {
-    if command -v xtensa-esp32s3-elf-gcc &>/dev/null; then return 0; fi
-    for try in "$HOME/export-esp.sh" "$HOME/esp/esp-idf/export.sh" \
-                /opt/esp/export.sh /opt/esp-idf/export.sh; do
-        if [ -f "$try" ]; then source "$try" 2>/dev/null; break; fi
-    done
-    command -v xtensa-esp32s3-elf-gcc &>/dev/null || {
-        echo "Error: xtensa-esp32s3-elf-gcc not found. Source your esp toolchain first." >&2
-        exit 1
-    }
-}
-
-detect_rust_esp() {
+# Detect and activate toolchains
+check_prereqs() {
     if ! command -v cargo &>/dev/null; then
         for try in "$HOME/.cargo/env" "$HOME/.rustup/env"; do
-            if [ -f "$try" ]; then source "$try" 2>/dev/null; break; fi
+            [ -f "$try" ] && { . "$try"; break; }
         done
     fi
     if ! command -v cargo &>/dev/null; then
-        echo "Error: cargo not found. Install Rust: https://rustup.rs" >&2
+        echo "Error: cargo not found.  Install Rust at https://rustup.rs" >&2
         exit 1
     fi
-    if ! cargo +esp build --help &>/dev/null 2>&1; then
-        echo "Error: Rust ESP toolchain not available. Run: espup install --toolchain-version X.Y.Z.Z" >&2
+
+    if ! command -v xtensa-esp32s3-elf-gcc &>/dev/null; then
+        for try in "$HOME/export-esp.sh" "$HOME/esp/esp-idf/export.sh" \
+                   /opt/esp/export.sh /opt/esp-idf/export.sh; do
+            if [ -f "$try" ]; then
+                echo "   Sourcing $try ..."
+                . "$try"
+                break
+            fi
+        done
+    fi
+    if ! command -v xtensa-esp32s3-elf-gcc &>/dev/null; then
+        echo "Error: xtensa-esp32s3-elf-gcc not found.  Source your ESP-IDF env first:" >&2
+        echo "    source \$HOME/export-esp.sh" >&2
         exit 1
     fi
 }
 
-detect_esp_toolchain
-detect_rust_esp
+check_prereqs
 
+# Cargo with ESP toolchain
+CARGO="cargo"
+if cargo +esp version &>/dev/null 2>&1; then
+    CARGO="cargo +esp"
+fi
+
+# Build
+PROFILE="${1:-release}"
+case "$PROFILE" in
+    debug)   CARGO_FLAGS="";          TARGET_SUBDIR="debug"   ;;
+    release) CARGO_FLAGS="--release"; TARGET_SUBDIR="release" ;;
+    *)       echo "Usage: $0 [debug|release]" >&2; exit 1
+esac
+
+echo "=== Building lexepub ($PROFILE) ==="
 cd "$LEXEPUB_DIR"
-echo "=== Building lexepub ==="
-cargo +esp build --release --features "c-ffi,lowmem" -p lexepub --lib \
-  --target xtensa-esp32s3-espidf -Z build-std=std,panic_abort
+$CARGO build $CARGO_FLAGS \
+    --features "c-ffi,lowmem" -p lexepub --lib \
+    --target xtensa-esp32s3-espidf \
+    -Z build-std=std,panic_abort
 
-TARGET_DIR="$LEXEPUB_DIR/target/xtensa-esp32s3-espidf/release"
+# Copy the static library
+# Cargo places the target at workspace root, not crate dir.
+WORKSPACE_ROOT="$(dirname "$LEXEPUB_DIR")"
+SRC="$WORKSPACE_ROOT/target/xtensa-esp32s3-espidf/$TARGET_SUBDIR/liblexepub.a"
+OUT="$OUTDIR/$TARGET_SUBDIR/liblexepub.a"
 
-mkdir -p "$REL_DIR/deps"
-cp "$TARGET_DIR/liblexepub.rlib" "$REL_DIR/"
-rm -f "$REL_DIR"/liblexepub.a
+mkdir -p "$OUTDIR/$TARGET_SUBDIR"
+cp "$SRC" "$OUT"
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
-
-for rlib in "$TARGET_DIR"/deps/*.rlib; do
-    crate_name="$(basename "$rlib" | sed 's/lib\(.*\)-[0-9a-f]*\.rlib$/\1/')"
-    [ -z "$crate_name" ] && continue
-    sub="$WORK/$crate_name"
-    mkdir -p "$sub"
-    (cd "$sub" && ar x "$rlib" 2>/dev/null || true)
-    for o in "$sub"/*.o; do
-        [ -f "$o" ] || continue
-        base="$(basename "$o")"
-        dest="$WORK/${crate_name}_${base}"
-        [ -f "$dest" ] || mv "$o" "$dest"
-    done
-    rmdir "$sub" 2>/dev/null || true
-done
-
-TMP_RDIR="$(mktemp -d)"
-(cd "$TMP_RDIR" && ar x "$TARGET_DIR/liblexepub.rlib")
-for o in "$TMP_RDIR"/*.o; do
-    [ -f "$o" ] || continue
-    base="$(basename "$o")"
-    dest="$WORK/lexepub_${base}"
-    [ -f "$dest" ] || mv "$o" "$dest"
-done
-rm -rf "$TMP_RDIR"
-cd "$WORK"
-
-nobj=$(ls *.o 2>/dev/null | wc -l)
-echo "=== Objects: $nobj ==="
-
-xtensa-esp32s3-elf-ar rcs "$REL_DIR/liblexepub.a" *.o 2>/dev/null
-cp "$TARGET_DIR"/deps/*.rlib "$REL_DIR/deps/" 2>/dev/null || true
-cp "$TARGET_DIR"/deps/*.rmeta "$REL_DIR/deps/" 2>/dev/null || true
-
-echo "=== $(basename "$REL_DIR")/liblexepub.a ==="
-ls -lh "$REL_DIR/liblexepub.a"
+echo "=== $OUT ==="
+ls -lh "$OUT"
