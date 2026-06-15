@@ -1,6 +1,6 @@
 [submodule "Code/PocketMage_V3/third_party/Mesh-NOW"]
 	path = Code/PocketMage_V3/third_party/Mesh-NOW
 	url = https://github.com/NellowTCS/Mesh-NOW.git
-[submodule "Code/PocketMage_V3_EpubReader/third_party/lexepub"]
-	path = Code/PocketMage_V3_EpubReader/third_party/lexepub
+[submodule "Code/PocketMage_EpubReader/third_party/lexepub"]
+	path = Code/PocketMage_EpubReader/third_party/lexepub
 	url = https://github.com/NellowTCS/lexepub
