@@ -42,7 +42,7 @@ jobs:
       - name: Install esp toolchain
         run: |
           cargo install espup
-          espup install --targets xtensa-esp32s3-espidf
+          espup install
           echo "$HOME/.rustup/toolchains/esp/bin" >> $GITHUB_PATH
 
       - name: Install just
