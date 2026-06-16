@@ -4,9 +4,9 @@
 [submodule "Code/HonzoReader/third_party/honzo"]
 	path = Code/HonzoReader/third_party/honzo
 	url = https://github.com/Nisoku/Honzo.git
-[submodule "Code/HonzoReader/third_party/html_parser"]
-	path = Code/HonzoReader/third_party/html_parser
+[submodule "Code/HonzoReader/lib/third_party/html_parser"]
+	path = Code/HonzoReader/lib/third_party/html_parser
 	url = https://github.com/NellowTCS/html_parser.git
-[submodule "Code/HonzoReader/third_party/md4c"]
-	path = Code/HonzoReader/third_party/md4c
-	url = https://github.com/mity/md4c.git
+[submodule "Code/HonzoReader/lib/third_party/md4c"]
+	path = Code/HonzoReader/lib/third_party/md4c
+	url = https://github.com/NellowTCS/md4c.git

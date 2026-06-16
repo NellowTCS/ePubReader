@@ -1,14 +1,94 @@
 #include <globals.h>
 #include <SD_MMC.h>
 #include <Fonts/FreeSerif9pt8b.h>
+#include <cpp/HonzoFileReader.hpp>
+#include <memory>
+#include <string>
+#include <vector>
 #include "reader.h"
 
-#include "EpubExtractor.h"
-using namespace capi;
+// BookReader wraps HonzoFileReader with chapter-index cache (RAII)
+struct HonzoChapter {
+    const char* text;
+    size_t      len;
+    uint8_t     markup;  // 0=Markdown, 1=HTML
+};
 
-static EpubExtractor* s_epub = nullptr;
-static char*          s_chapterText = nullptr;
-static size_t         s_chapterTextCap = 0;
+class BookReader {
+public:
+    ~BookReader() { close(); }
+
+    BookReader() = default;
+    BookReader(const BookReader&) = delete;
+    BookReader& operator=(const BookReader&) = delete;
+
+    bool open(const char* path) {
+        close();
+
+        auto outer = HonzoFileReader::open(std::string_view(path), 1);
+        if (!outer.is_ok()) return false;
+
+        auto inner = std::move(outer).ok();
+        if (!inner || !(*inner).is_ok()) return false;
+
+        auto file = std::move(*std::move(*inner).ok());
+        if (!file) return false;
+
+        uint32_t total = file->chunk_count();
+        if (total == 0) return false;
+
+        for (uint32_t i = 0; i < total; i++) {
+            uint32_t tag = file->get_chunk_type(i);
+            if (tag == 0x50414843) {          // "CHAP" as little-endian tag
+                uint8_t kind = file->get_chunk_content_type_kind(i);
+                uint8_t val  = file->get_chunk_content_type_value(i);
+                chap_indices_.push_back(i);
+                chap_markup_.push_back((kind == 1 && val == 1) ? 1 : 0);
+            }
+        }
+
+        chapter_count_ = chap_indices_.size();
+        if (chapter_count_ == 0) return false;
+
+        reader_ = std::move(file);
+        return true;
+    }
+
+    void close() {
+        reader_.reset();
+        chap_indices_.clear();
+        chap_markup_.clear();
+        chapter_count_ = 0;
+    }
+
+    uint32_t chapter_count() const { return chapter_count_; }
+
+    bool load_chapter(uint32_t idx, HonzoChapter& out) {
+        if (!reader_ || idx >= chapter_count_) return false;
+        uint32_t toc_idx = chap_indices_[idx];
+        auto chunk = reader_->get_chunk(toc_idx);
+        if (!chunk.has_value()) return false;
+        out.text   = reinterpret_cast<const char*>(chunk->data());
+        out.len    = chunk->size();
+        out.markup = chap_markup_[idx];
+        return true;
+    }
+
+    std::string get_meta_json() {
+        if (!reader_) return {};
+        auto result = reader_->get_meta();
+        if (!result.is_ok()) return {};
+        return std::move(result).ok().value();
+    }
+
+private:
+    std::unique_ptr<HonzoFileReader> reader_;
+    uint32_t chapter_count_ = 0;
+    std::vector<uint32_t> chap_indices_;
+    std::vector<uint8_t>  chap_markup_;
+};
+
+static BookReader s_book;
 
 // TOC JSON parser helpers
 static const char* skip_ws(const char* p) {
@@ -46,45 +126,31 @@ static const char* scan_int_val(const char* p, int* out) {
 // Open book
 void open_book(const char* filename) {
     Serial.printf("[open_book] filename=\"%s\"\n", filename);
-    if (s_epub) { EpubExtractor_destroy(s_epub); s_epub = nullptr; Serial.printf("[open_book] destroyed old extractor\n"); }
 
     char full[256];
     snprintf(full, sizeof(full), "/sdcard/books/%s", filename);
-    Serial.printf("[open_book] full path=\"%s\" len=%u\n", full, strlen(full));
-
-    char sdcheck[256];
-    snprintf(sdcheck, sizeof(sdcheck), "/books/%s", filename);
-    Serial.printf("[open_book] SD_MMC.exists(\"%s\")=%d\n", sdcheck, (int)SD_MMC.exists(sdcheck));
 
     g_appMode = MODE_READING;
 
-    s_epub = EpubExtractor_create(full, strlen(full));
-    Serial.printf("[open_book] EpubExtractor_create returned %p\n", s_epub);
-    if (!s_epub) {
-        Serial.printf("[open_book] CREATE FAILED - null pointer\n");
+    s_book.close();
+    bool ok = s_book.open(full);
+    Serial.printf("[open_book] BookReader::open returned %d\n", ok);
+    if (!ok) {
         g_chapterCount = 0;
         g_needsRedraw = true;
         return;
     }
 
-    bool valid = EpubExtractor_get_metadata_is_valid(s_epub);
-    Serial.printf("[open_book] metadata_valid=%d\n", (int)valid);
-
-    g_chapterCount = (uint16_t)EpubExtractor_get_chapter_count(s_epub);
-    Serial.printf("[open_book] chapter_count=%u\n", g_chapterCount);
-    // g_totalWords   = (uint32_t)EpubExtractor_get_total_word_count(s_epub);
-    // Serial.printf("[open_book] total_words=%u\n", g_totalWords);
-    g_totalWords = 0;
+    g_chapterCount = (uint16_t)s_book.chapter_count();
+    g_totalWords   = 0;
     g_totalPages   = 0;
 
-    // Extract TOC from OPF metadata
+    // Parse META JSON for TOC titles
     {
-        char tocBuf[8192];
-        DiplomatWriteable tocW = diplomat_simple_write(tocBuf, sizeof(tocBuf));
-        auto tocResult = EpubExtractor_get_toc_json(s_epub, &tocW);
-        if (tocResult.is_ok) {
+        auto metaStr = s_book.get_meta_json();
+        if (!metaStr.empty()) {
             g_tocCount = 0;
-            const char* p = tocBuf;
+            const char* p = metaStr.c_str();
             while (*p && *p != '[') p++;
             if (*p == '[') {
                 p++;
@@ -99,13 +165,11 @@ void open_book(const char* filename) {
                     while (*p && *p != '}') {
                         p = skip_ws(p);
                         if (*p != '"') { p++; continue; }
-
                         char key[32] = {};
                         p = scan_string_val(p, key, sizeof(key));
                         p = skip_ws(p);
                         if (*p == ':') p++;
                         p = skip_ws(p);
-
                         if (strcmp(key, "chapter_index") == 0) {
                             p = scan_int_val(p, &ci);
                         } else if (strcmp(key, "title") == 0) {
@@ -122,7 +186,6 @@ void open_book(const char* filename) {
                         if (*p == ',') p++;
                     }
                     if (*p == '}') p++;
-
                     if (ci >= 0) {
                         g_toc[g_tocCount].index = (uint16_t)ci;
                         strncpy(g_toc[g_tocCount].title, title, sizeof(g_toc[0].title) - 1);
@@ -132,8 +195,6 @@ void open_book(const char* filename) {
                     if (*p == ',') p++;
                 }
             }
-        } else {
-            g_tocCount = 0;
         }
     }
 
@@ -142,82 +203,34 @@ void open_book(const char* filename) {
     // Restore bookmark
     Bookmark bm;
     if (loadBookmark(&bm)) {
-        Serial.printf("[open_book] bookmark restored chapter=%u page=%u\n", bm.chapter, bm.page);
         g_curChapter = bm.chapter;
         g_curPage    = bm.page;
     } else {
-        Serial.printf("[open_book] no bookmark, starting at 0,0\n");
         g_curChapter = 0;
         g_curPage    = 0;
     }
 
-    Serial.printf("[open_book] calling reader_load_chapter(%u)\n", g_curChapter);
     reader_load_chapter(g_curChapter);
-    Serial.printf("[open_book] done, setting g_needsRedraw\n");
     g_needsRedraw = true;
 }
 
-    // Load a chapter using streaming text API
+// Load a chapter
 void reader_load_chapter(uint16_t chapter) {
-    Serial.printf("[load_chapter] chapter=%u g_chapterCount=%u s_epub=%p\n", chapter, g_chapterCount, s_epub);
     if (chapter >= g_chapterCount) {
         chapter = g_chapterCount > 0 ? g_chapterCount - 1 : 0;
-        Serial.printf("[load_chapter] clamped to %u\n", chapter);
     }
-    if (!s_epub) { Serial.printf("[load_chapter] NO EPUB - returning\n"); return; }
 
     g_curChapter = chapter;
 
-    // Open formatting-aware streaming reader
-    ChapterFormattingStream* stream = EpubExtractor_open_chapter_formatting_stream(s_epub, chapter);
-    if (!stream) {
-        // Fall back to plain-text stream
-        Serial.printf("[load_chapter] FORMATTING STREAM FAILED, falling back to text\n");
-        ChapterTextStream* textStream = EpubExtractor_open_chapter_text_stream(s_epub, chapter);
-        if (!textStream) {
-            Serial.printf("[load_chapter] TEXT STREAM ALSO FAILED\n");
-            return;
-        }
-        size_t cap = 4096;
-        size_t len = 0;
-        if (!s_chapterText || s_chapterTextCap < cap) {
-            if (s_chapterText) free(s_chapterText);
-            s_chapterText = (char*)malloc(cap);
-            if (!s_chapterText) {
-                Serial.printf("[load_chapter] MALLOC FAILED for text buffer\n");
-                ChapterTextStream_destroy(textStream);
-                return;
-            }
-            s_chapterTextCap = cap;
-        }
-        char chunk[1025];
-        DiplomatWriteable cw = diplomat_simple_write(chunk, 1024);
-        while (ChapterTextStream_read_chunk(textStream, &cw)) {
-            size_t chunkLen = cw.len;
-            if (chunkLen == 0) { cw = diplomat_simple_write(chunk, 1024); continue; }
-            if (len + chunkLen + 1 > s_chapterTextCap) {
-                size_t newCap = s_chapterTextCap * 2;
-                if (newCap < len + chunkLen + 1) newCap = len + chunkLen + 1;
-                char* newBuf = (char*)realloc(s_chapterText, newCap);
-                if (!newBuf) { Serial.printf("[load_chapter] REALLOC FAILED\n"); break; }
-                s_chapterText = newBuf;
-                s_chapterTextCap = newCap;
-            }
-            memcpy(s_chapterText + len, chunk, chunkLen);
-            len += chunkLen;
-            cw = diplomat_simple_write(chunk, 1024);
-        }
-        ChapterTextStream_destroy(textStream);
-        if (len == 0) return;
-        s_chapterText[len] = '\0';
-        render_chapter_text(s_chapterText, len);
-    } else {
-        render_chapter_formatted(stream);
-        ChapterFormattingStream_destroy(stream);
+    HonzoChapter hc;
+    if (!s_book.load_chapter(chapter, hc)) {
+        Serial.printf("[load_chapter] FAILED to load chapter %u\n", chapter);
+        return;
     }
 
+    render_chapter_markup(hc.text, hc.len, hc.markup);
+
     if (g_curPage >= g_pagesInChapter) g_curPage = 0;
-    Serial.printf("[load_chapter] complete\n");
 }
 
 // Process keys
@@ -269,7 +282,7 @@ void reader_process_key(char ch) {
     } else if (ch == 'h') {
         saveBookmark();
         SD_MMC.remove(CUR_PATH);
-        if (s_epub) { EpubExtractor_destroy(s_epub); s_epub = nullptr; }
+        s_book.close();
         library_init();
     } else if (ch == 'j') {
         g_jumpLen = 0;
@@ -283,10 +296,8 @@ void reader_process_key(char ch) {
 
 // Reader render
 void reader_render() {
-    Serial.printf("[reader_render] s_epub=%p g_chapterCount=%u\n", s_epub, g_chapterCount);
-
-    if (!s_epub || g_chapterCount == 0) {
-        Serial.printf("[reader_render] CANNOT OPEN BOOK s_epub=%p chCount=%u\n", s_epub, g_chapterCount);
+    if (g_chapterCount == 0) {
+        Serial.printf("[reader_render] NO CHAPTERS\n");
         display.fillScreen(GxEPD_WHITE);
         display.setFont(&FreeSerif9pt8b);
         display.setCursor(10, 60);

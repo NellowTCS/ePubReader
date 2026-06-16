@@ -10,8 +10,8 @@
 #include <Fonts/FreeSerifBold18pt8b.h>
 #include <Fonts/FreeMonoBold9pt8b.h>
 #include "reader.h"
-#include "EpubExtractor.h"
-using namespace capi;
+extern int md4c_to_runs(const char* text, size_t len, StyledRun* runs, int max_runs, char* pool, int pool_cap);
+extern int html_to_runs(const char* text, size_t len, StyledRun* runs, int max_runs, char* pool, int pool_cap);
 
 // Display constants
 static constexpr int16_t MARGIN_X = 8;
@@ -308,13 +308,12 @@ void render_chapter_text(const char* text, size_t text_len) {
     Serial.printf("[render_chapter_text] done pages=%u\n", g_pageCount);
 }
 
-// Formatting-aware renderer using ChapterFormattingStream.
-void render_chapter_formatted(ChapterFormattingStream* stream) {
-    Serial.printf("[render_chapter_formatted] stream=%p\n", stream);
+// Markup-aware renderer dispatches to md4c or html_parser.
+void render_chapter_markup(const char* text, size_t len, uint8_t markup) {
+    Serial.printf("[render_chapter_markup] len=%zu markup=%u\n", len, markup);
     g_pagesInChapter = 0;
     g_pageCount = 0;
 
-    // Allocate run array + text pool (heap, freed by the next call)
     static StyledRun* s_runs = nullptr;
     static char*      s_pool = nullptr;
     if (s_runs) free(s_runs);
@@ -322,51 +321,19 @@ void render_chapter_formatted(ChapterFormattingStream* stream) {
     s_runs = (StyledRun*)malloc(1024 * sizeof(StyledRun));
     s_pool = (char*)malloc(24576);
     if (!s_runs || !s_pool) {
-        Serial.printf("[render_chapter_formatted] MALLOC FAILED\n");
         g_pagesInChapter = 0; g_pageCount = 1; return;
     }
 
-    int runCount = 0;
-    size_t poolUsed = 0;
-
-    char textBuf[1024];
-
-    while (ChapterFormattingStream_next_run(stream) && runCount < 1024) {
-        uint8_t style   = ChapterFormattingStream_run_style(stream);
-        uint8_t heading = ChapterFormattingStream_run_heading(stream);
-
-        DiplomatWriteable w = diplomat_simple_write(textBuf, 1024);
-        diplomat_result_void_void res = ChapterFormattingStream_run_text(stream, &w);
-        if (!res.is_ok) break;
-        size_t textLen = w.len;
-        if (textLen == 0) continue;
-
-        // Copy text into pool
-        if (poolUsed + textLen + 1 > 24576) break;  // pool full
-        memcpy(s_pool + poolUsed, textBuf, textLen);
-        s_pool[poolUsed + textLen] = '\0';
-
-        // Fill StyledRun
-        StyledRun* run = &s_runs[runCount];
-        run->text    = s_pool + poolUsed;
-        run->len     = textLen;
-        run->heading = heading;
-        run->flags   = (style & 16) ? 1 : 0;  // bit 4 = code
-        run->indent  = 0;
-
-        // Map style to font:
-        //   font 0 = body, 1 = bold, 2 = italic, 3 = bold-italic
-        uint8_t bold   = (style & 1) ? 1 : 0;   // STYLE_BOLD
-        uint8_t italic = (style & 2) ? 1 : 0;   // STYLE_ITALIC
-        run->font = bold ? (italic ? 3 : 1) : (italic ? 2 : 0);
-
-        poolUsed += textLen + 1;
-        runCount++;
+    int runCount;
+    if (markup == 1) {
+        runCount = html_to_runs(text, len, s_runs, 1024, s_pool, 24576);
+    } else {
+        runCount = md4c_to_runs(text, len, s_runs, 1024, s_pool, 24576);
     }
 
-    Serial.printf("[render_chapter_formatted] %d runs, poolUsed=%u\n", runCount, poolUsed);
+    Serial.printf("[render_chapter_markup] %d runs\n", runCount);
 
-    if (runCount == 0) {
+    if (runCount <= 0) {
         free(s_runs); s_runs = nullptr;
         free(s_pool); s_pool = nullptr;
         g_pagesInChapter = 0; g_pageCount = 1; return;
@@ -378,7 +345,7 @@ void render_chapter_formatted(ChapterFormattingStream* stream) {
     g_pageCount = (uint16_t)s_pageCount;
     g_pagesInChapter = g_pageCount;
     if (g_pageCount == 0) g_pageCount = 1;
-    Serial.printf("[render_chapter_formatted] done pages=%u\n", g_pageCount);
+    Serial.printf("[render_chapter_markup] done pages=%u\n", g_pageCount);
 }
 
 // Old JSON-based renderer (kept for reference, unused by default)
@@ -552,7 +519,7 @@ void updateOLED() {
     u8g2.setFont(u8g2_font_5x8_tf);
 
     if (g_appMode == MODE_LIBRARY) {
-        u8g2.drawStr(0, 8, "ePub Reader");
+        u8g2.drawStr(0, 8, "Honzo Reader");
         if (g_bookCount > 0 && g_selIndex < g_bookCount) {
             u8g2.setCursor(0, 20);
             u8g2.printf("%d/%d", g_selIndex + 1, g_bookCount);

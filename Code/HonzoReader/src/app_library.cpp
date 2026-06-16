@@ -67,7 +67,7 @@ void loadCurrentBook() {
     }
 }
 
-// Library: scan SD for .epub files
+// Library: scan SD for .hzo files
 void library_init() {
     g_appMode     = MODE_LIBRARY;
     g_bookCount   = 0;
@@ -89,7 +89,7 @@ void library_init() {
         if (!entry.isDirectory()) {
             const char* name = entry.name();
             const char* ext  = strrchr(name, '.');
-            if (ext && (strcasecmp(ext, ".epub") == 0)) {
+            if (ext && (strcasecmp(ext, ".hzo") == 0)) {
                 strncpy(g_books[g_bookCount].name, name, sizeof(g_books[0].name) - 1);
                 g_bookCount++;
             }
@@ -137,15 +137,15 @@ void library_render() {
 
     display.setFont(&FreeSerifBold12pt8b);
     display.setCursor(8, 18);
-    display.print("ePub Reader");
+    display.print("Honzo Reader");
     display.drawFastHLine(0, 22, display.width(), GxEPD_BLACK);
 
     if (g_bookCount == 0) {
         display.setFont(&FreeSerif9pt8b);
         display.setCursor(8, 55);
-        display.print("No .epub files found");
+        display.print("No .hzo files found");
         display.setCursor(8, 75);
-        display.print("Place them in /books/ on SD");
+        display.print("Place .hzo files in /books/ on SD");
         EINK().refresh();
         return;
     }
@@ -165,7 +165,7 @@ void library_render() {
 
         display.setCursor(8, y);
         String name = g_books[i].name;
-        if (name.endsWith(".epub")) name = name.substring(0, name.length() - 5);
+        if (name.endsWith(".hzo")) name = name.substring(0, name.length() - 4);
         if ((int)name.length() > 38) name = name.substring(0, 36) + "..";
         display.print(name);
         y += 16;

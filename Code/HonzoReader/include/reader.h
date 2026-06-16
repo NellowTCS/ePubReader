@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <cstring>
 #include <Adafruit_GFX.h>
-#include "EpubExtractor.h"
 
 // SD paths
 static constexpr const char* BOOKS_DIR  = "/books";
@@ -118,6 +117,6 @@ void touch_scroll();
 
 void render_chapter_text(const char* text, size_t text_len);
 void render_chapter(const char* json);
-void render_chapter_formatted(capi::ChapterFormattingStream* stream);
+void render_chapter_markup(const char* text, size_t len, uint8_t markup);
 void render_page_to_eink(uint16_t pageIdx);
 void updateOLED();
