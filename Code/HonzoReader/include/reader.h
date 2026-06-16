@@ -5,9 +5,10 @@
 #include <Adafruit_GFX.h>
 
 // SD paths
-static constexpr const char* BOOKS_DIR  = "/books";
-static constexpr const char* BMARKS_DIR = "/books/.bmarks";
-static constexpr const char* CUR_PATH   = "/books/.current";
+static constexpr const char* BOOKS_DIR    = "/books";
+static constexpr const char* BMARKS_DIR   = "/books/.bmarks";
+static constexpr const char* CUR_PATH     = "/books/.current";
+static constexpr const char* META_CACHE   = "/books/.meta";
 
 // App modes
 enum AppMode : uint8_t {
@@ -21,6 +22,8 @@ enum AppMode : uint8_t {
 // Book entry
 struct BookEntry {
     char name[128];
+    char title[128];
+    char author[64];
 };
 
 // Bookmark
@@ -62,6 +65,8 @@ extern int         g_bookCount;
 extern int         g_selIndex;
 
 extern char        g_curBook[128];
+extern char        g_bookTitle[128];
+extern char        g_bookAuthor[64];
 extern uint16_t    g_curChapter;
 extern uint16_t    g_curPage;
 extern uint16_t    g_chapterCount;
@@ -118,3 +123,6 @@ void touch_scroll();
 void render_chapter_markup(const char* text, size_t len, uint8_t markup);
 void render_page_to_eink(uint16_t pageIdx);
 void updateOLED();
+
+// Metadata helpers
+bool extract_book_meta(const char* full_path, char* title, int titleMax, char* author, int authorMax);

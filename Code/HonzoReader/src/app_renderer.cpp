@@ -538,6 +538,7 @@ void render_page_to_eink(uint16_t pageIdx) {
 
     if (!g_pages || g_pageCount == 0) {
         u8g2Fonts.setFont(u8g2_font_ncenR12_tf);
+        u8g2Fonts.setFontMode(1);
         u8g2Fonts.setForegroundColor(GxEPD_BLACK);
         u8g2Fonts.drawUTF8(10, 60, "No content");
         return;
@@ -564,6 +565,7 @@ void render_page_to_eink(uint16_t pageIdx) {
 
             FontSlot fs = pick_font(run->heading, run->font, run->flags & 1);
             u8g2Fonts.setFont(fs.font);
+            u8g2Fonts.setFontMode(1);
 
             int runlen = min((int)run->len, 1023);
             char buf[1024];

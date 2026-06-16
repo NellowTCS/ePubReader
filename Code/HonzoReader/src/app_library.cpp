@@ -5,6 +5,7 @@
 #include <Fonts/FreeSerifBold12pt8b.h>
 #include <Fonts/FreeSerif9pt8b.h>
 #include "reader.h"
+#include "honzo_meta.h"
 
 // Bookmark save/load
 bool saveBookmark() {
@@ -67,6 +68,39 @@ void loadCurrentBook() {
     }
 }
 
+// Metadata cache: save/load book titles/authors
+static void save_meta_cache() {
+    File f = SD_MMC.open(META_CACHE, FILE_WRITE);
+    if (!f) return;
+    for (int i = 0; i < g_bookCount; i++) {
+        f.printf("%s|%s|%s\n", g_books[i].name, g_books[i].title, g_books[i].author);
+    }
+    f.close();
+}
+
+static void load_meta_cache() {
+    if (!SD_MMC.exists(META_CACHE)) return;
+    File f = SD_MMC.open(META_CACHE, FILE_READ);
+    if (!f) return;
+    for (int i = 0; i < g_bookCount && f.available(); ) {
+        String line = f.readStringUntil('\n');
+        line.trim();
+        // Split on |
+        int p1 = line.indexOf('|');
+        if (p1 < 0) continue;
+        int p2 = line.indexOf('|', p1 + 1);
+        String fname = line.substring(0, p1);
+        // Match by filename
+        if (strcmp(fname.c_str(), g_books[i].name) != 0) { i++; continue; }
+        String t = (p2 > p1) ? line.substring(p1 + 1, p2) : "";
+        String a = (p2 > 0 && p2 + 1 < (int)line.length()) ? line.substring(p2 + 1) : "";
+        strncpy(g_books[i].title, t.c_str(), sizeof(g_books[0].title) - 1);
+        strncpy(g_books[i].author, a.c_str(), sizeof(g_books[0].author) - 1);
+        i++;
+    }
+    f.close();
+}
+
 // Library: scan SD for .hzo files
 void library_init() {
     g_appMode     = MODE_LIBRARY;
@@ -91,12 +125,37 @@ void library_init() {
             const char* ext  = strrchr(name, '.');
             if (ext && (strcasecmp(ext, ".hzo") == 0)) {
                 strncpy(g_books[g_bookCount].name, name, sizeof(g_books[0].name) - 1);
+                g_books[g_bookCount].title[0] = '\0';
+                g_books[g_bookCount].author[0] = '\0';
                 g_bookCount++;
             }
         }
         entry.close();
     }
     dir.close();
+
+    // Load cached metadata
+    load_meta_cache();
+
+    // Extract metadata for any books missing title
+    bool need_save = false;
+    for (int i = 0; i < g_bookCount; i++) {
+        if (g_books[i].title[0] == '\0') {
+            char full_path[256];
+            snprintf(full_path, sizeof(full_path), "/sdcard/books/%s", g_books[i].name);
+            if (honzo_extract_meta(full_path, g_books[i].title, sizeof(g_books[0].title),
+                                   g_books[i].author, sizeof(g_books[0].author))) {
+                need_save = true;
+            }
+        }
+        // Fallback: use filename without extension
+        if (g_books[i].title[0] == '\0') {
+            strncpy(g_books[i].title, g_books[i].name, sizeof(g_books[0].title) - 1);
+            char* dot = strrchr(g_books[i].title, '.');
+            if (dot) *dot = '\0';
+        }
+    }
+    if (need_save) save_meta_cache();
 
     if (g_bookCount > 0) {
         loadCurrentBook();
@@ -164,10 +223,9 @@ void library_render() {
         }
 
         display.setCursor(8, y);
-        String name = g_books[i].name;
-        if (name.endsWith(".hzo")) name = name.substring(0, name.length() - 4);
-        if ((int)name.length() > 38) name = name.substring(0, 36) + "..";
-        display.print(name);
+        String title = g_books[i].title;
+        if ((int)title.length() > 38) title = title.substring(0, 36) + "..";
+        display.print(title);
         y += 16;
     }
 

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "reader.h"
+#include "honzo_meta.h"
 
 // BookReader wraps HonzoFileReader with chapter-index cache (RAII)
 struct HonzoChapter {
@@ -90,39 +91,6 @@ private:
 
 static BookReader s_book;
 
-// TOC JSON parser helpers
-static const char* skip_ws(const char* p) {
-    while (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t') p++;
-    return p;
-}
-
-static const char* scan_string_val(const char* p, char* out, int maxLen) {
-    if (*p != '"') return p;
-    p++;
-    int i = 0;
-    while (*p && *p != '"' && i < maxLen - 1) {
-        if (*p == '\\' && *(p+1)) { p++; }
-        out[i++] = *p;
-        p++;
-    }
-    out[i] = '\0';
-    if (*p == '"') p++;
-    return p;
-}
-
-static const char* scan_int_val(const char* p, int* out) {
-    *out = 0;
-    bool neg = false;
-    p = skip_ws(p);
-    if (*p == '-') { neg = true; p++; }
-    while (*p >= '0' && *p <= '9') {
-        *out = *out * 10 + (*p - '0');
-        p++;
-    }
-    if (neg) *out = -*out;
-    return p;
-}
-
 // Open book
 void open_book(const char* filename) {
     Serial.printf("[open_book] filename=\"%s\"\n", filename);
@@ -144,61 +112,44 @@ void open_book(const char* filename) {
     g_chapterCount = (uint16_t)s_book.chapter_count();
     g_totalWords   = 0;
     g_totalPages   = 0;
+    g_bookTitle[0] = '\0';
+    g_bookAuthor[0] = '\0';
 
-    // Parse META JSON for TOC titles
+    // Extract book title/author from META JSON
     {
         auto metaStr = s_book.get_meta_json();
         if (!metaStr.empty()) {
-            g_tocCount = 0;
-            const char* p = metaStr.c_str();
-            while (*p && *p != '[') p++;
-            if (*p == '[') {
-                p++;
-                while (*p && g_tocCount < 64) {
-                    p = skip_ws(p);
-                    if (*p == ']') break;
-                    if (*p != '{') { p++; continue; }
-
-                    int ci = -1;
-                    char title[64] = {};
-                    p++;
-                    while (*p && *p != '}') {
-                        p = skip_ws(p);
-                        if (*p != '"') { p++; continue; }
-                        char key[32] = {};
-                        p = scan_string_val(p, key, sizeof(key));
-                        p = skip_ws(p);
-                        if (*p == ':') p++;
-                        p = skip_ws(p);
-                        if (strcmp(key, "chapter_index") == 0) {
-                            p = scan_int_val(p, &ci);
-                        } else if (strcmp(key, "title") == 0) {
-                            p = scan_string_val(p, title, sizeof(title));
-                        } else {
-                            if (*p == '"') {
-                                char dummy[8];
-                                p = scan_string_val(p, dummy, sizeof(dummy));
-                            } else {
-                                while (*p && *p != ',' && *p != '}') p++;
-                            }
-                        }
-                        p = skip_ws(p);
-                        if (*p == ',') p++;
-                    }
-                    if (*p == '}') p++;
-                    if (ci >= 0) {
-                        g_toc[g_tocCount].index = (uint16_t)ci;
-                        strncpy(g_toc[g_tocCount].title, title, sizeof(g_toc[0].title) - 1);
-                        g_tocCount++;
-                    }
-                    p = skip_ws(p);
-                    if (*p == ',') p++;
-                }
-            }
+            honzo_scan_meta_json(metaStr.c_str(),
+                                 g_bookTitle, sizeof(g_bookTitle),
+                                 g_bookAuthor, sizeof(g_bookAuthor));
         }
     }
 
-    Serial.printf("[open_book] toc_count=%u\n", g_tocCount);
+    // Build TOC from chapter first-headings
+    {
+        g_tocCount = 0;
+        for (uint16_t ci = 0; ci < g_chapterCount && g_tocCount < 64; ci++) {
+            HonzoChapter hc;
+            if (!s_book.load_chapter(ci, hc)) {
+                // Fallback: generic title
+                snprintf(g_toc[g_tocCount].title, sizeof(g_toc[0].title), "Chapter %u", ci + 1);
+                g_toc[g_tocCount].index = ci;
+                g_tocCount++;
+                continue;
+            }
+            char heading[64];
+            honzo_extract_heading(hc.text, hc.len, hc.markup, heading, sizeof(heading));
+            if (heading[0] == '\0') {
+                snprintf(g_toc[g_tocCount].title, sizeof(g_toc[0].title), "Chapter %u", ci + 1);
+            } else {
+                strncpy(g_toc[g_tocCount].title, heading, sizeof(g_toc[0].title) - 1);
+            }
+            g_toc[g_tocCount].index = ci;
+            g_tocCount++;
+        }
+    }
+
+    Serial.printf("[open_book] title=\"%s\" toc_count=%u\n", g_bookTitle, g_tocCount);
 
     // Restore bookmark
     Bookmark bm;

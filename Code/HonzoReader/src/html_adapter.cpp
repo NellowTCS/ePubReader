@@ -200,10 +200,29 @@ static void tag_callback(struct html_tag* tag, void* userdata) {
     }
 }
 
+static void skip_doctype(const char** p, size_t* len) {
+    const char* s = *p;
+    size_t l = *len;
+    while (l > 0) {
+        // Skip whitespace
+        while (l > 0 && (*s == ' ' || *s == '\n' || *s == '\r' || *s == '\t')) {
+            s++; l--;
+        }
+        if (l < 2 || s[0] != '<' || s[1] != '!') break;
+        const char* end = (const char*)memchr(s, '>', l);
+        if (!end) break;
+        size_t skip = (size_t)(end - s + 1);
+        s += skip; l -= skip;
+    }
+    *p = s;
+    *len = l;
+}
+
 int html_to_runs(const char* text, size_t len,
                   StyledRun* runs, int max_runs,
                   char* pool, int pool_cap)
 {
+    skip_doctype(&text, &len);
     HtmlCtx ctx;
     ctx.runs      = runs;
     ctx.max_runs  = max_runs;

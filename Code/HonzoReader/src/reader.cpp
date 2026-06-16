@@ -6,6 +6,8 @@ int         g_bookCount     = 0;
 int         g_selIndex      = 0;
 
 char        g_curBook[128]  = {};
+char        g_bookTitle[128] = {};
+char        g_bookAuthor[64] = {};
 uint16_t    g_curChapter    = 0;
 uint16_t    g_curPage       = 0;
 uint16_t    g_chapterCount  = 0;
