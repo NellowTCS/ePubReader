@@ -19,6 +19,11 @@ struct HtmlCtx {
     // Text accumulation state
     int      text_start;  // pool offset of current text (-1 if none)
     bool     in_para;     // true inside <p> or block element
+
+    // Cursor for extracting text between tags (set to begin of source)
+    const char* cursor;
+    // End of source text for final text extraction
+    const char* source_end;
 };
 
 struct TagStack {
@@ -87,29 +92,36 @@ static int emit_newline(HtmlCtx* ctx) {
     return 0;
 }
 
+// Extract clean text between the cursor and tag start, then advance cursor past tag end.
+static void extract_between(HtmlCtx* ctx, struct html_tag* tag) {
+    // Extract text from cursor up to this tag
+    if (tag->start > ctx->cursor) {
+        int raw_len = (int)(tag->start - ctx->cursor);
+        const char* p = ctx->cursor;
+        int len = raw_len;
+        // Trim leading whitespace on first fragment
+        while (len > 0 && (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t')) {
+            p++; len--;
+        }
+        // Trim trailing whitespace
+        while (len > 0 && (p[len-1] == ' ' || p[len-1] == '\n' || p[len-1] == '\r' || p[len-1] == '\t'))
+            len--;
+        if (len > 0) {
+            append_text(ctx, p, len);
+        }
+    }
+    ctx->cursor = tag->end;
+}
+
 static void tag_callback(struct html_tag* tag, void* userdata) {
     HtmlCtx* ctx = (HtmlCtx*)userdata;
     const char* name = tag->name;
 
+    // Extract clean text between tags (no HTML markup) on every tag callback.
+    extract_between(ctx, tag);
+
     if (tag->is_end_tag) {
         if (sp == 0) return;
-
-        // Extract text content between start and end tags
-        if (tag->contents_begin && tag->contents_end) {
-            int text_len = (int)(tag->contents_end - tag->contents_begin);
-            const char* tstart = tag->contents_begin;
-            // Trim leading whitespace
-            while (text_len > 0 && (*tstart == ' ' || *tstart == '\n' || *tstart == '\r' || *tstart == '\t')) {
-                tstart++; text_len--;
-            }
-            // Trim trailing whitespace
-            while (text_len > 0 && (tstart[text_len-1] == ' ' || tstart[text_len-1] == '\n' || tstart[text_len-1] == '\r' || tstart[text_len-1] == '\t'))
-                text_len--;
-            if (text_len > 0) {
-                if (strcmp(name, "script") != 0 && strcmp(name, "style") != 0)
-                    append_text(ctx, tstart, text_len);
-            }
-        }
 
         sp--;
         TagStack* s = &stack[sp];
@@ -201,9 +213,26 @@ int html_to_runs(const char* text, size_t len,
     ctx.cur_indent  = 0;
     ctx.text_start  = -1;
     ctx.in_para     = false;
+    ctx.cursor      = text;
+    ctx.source_end  = text + len;
     sp = 0;
 
     html_scan_tags(text, (int)len, tag_callback, &ctx, HTML_SCAN_TRIM_VALUES, NULL, NULL);
+
+    // Extract any remaining text after the last tag
+    if (ctx.cursor < ctx.source_end) {
+        int raw_len = (int)(ctx.source_end - ctx.cursor);
+        const char* p = ctx.cursor;
+        int len = raw_len;
+        while (len > 0 && (*p == ' ' || *p == '\n' || *p == '\r' || *p == '\t')) {
+            p++; len--;
+        }
+        while (len > 0 && (p[len-1] == ' ' || p[len-1] == '\n' || p[len-1] == '\r' || p[len-1] == '\t'))
+            len--;
+        if (len > 0) {
+            append_text(&ctx, p, len);
+        }
+    }
 
     commit_text(&ctx);
     return ctx.run_count;
