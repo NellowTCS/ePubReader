@@ -7,3 +7,9 @@
 [submodule "Code/PocketMage_EpubReader/third_party/honzo"]
 	path = Code/PocketMage_EpubReader/third_party/honzo
 	url = https://github.com/Nisoku/Honzo.git
+[submodule "Code/PocketMage_EpubReader/third_party/html_parser"]
+	path = Code/PocketMage_EpubReader/third_party/html_parser
+	url = https://github.com/NellowTCS/html_parser.git
+[submodule "Code/PocketMage_EpubReader/third_party/md4c"]
+	path = Code/PocketMage_EpubReader/third_party/md4c
+	url = https://github.com/mity/md4c.git
