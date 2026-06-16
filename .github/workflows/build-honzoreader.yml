@@ -43,7 +43,6 @@ jobs:
         run: |
           cargo install espup
           espup install
-          echo "$HOME/.rustup/toolchains/esp/bin" >> $GITHUB_PATH
 
       - name: Install just
         uses: taiki-e/install-action@v2
@@ -51,7 +50,10 @@ jobs:
           tool: just
 
       - name: Build
-        run: just build
+        shell: bash
+        run: |
+          . $HOME/export-esp.sh
+          just build
 
       - name: Commit HonzoReader.tar if changed
         uses: stefanzweifel/git-auto-commit-action@v5
