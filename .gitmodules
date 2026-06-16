@@ -1,15 +1,12 @@
 [submodule "Code/PocketMage_V3/third_party/Mesh-NOW"]
 	path = Code/PocketMage_V3/third_party/Mesh-NOW
 	url = https://github.com/NellowTCS/Mesh-NOW.git
-[submodule "Code/PocketMage_EpubReader/third_party/lexepub"]
-	path = Code/PocketMage_EpubReader/third_party/lexepub
-	url = https://github.com/NellowTCS/lexepub
-[submodule "Code/PocketMage_EpubReader/third_party/honzo"]
-	path = Code/PocketMage_EpubReader/third_party/honzo
+[submodule "Code/HonzoReader/third_party/honzo"]
+	path = Code/HonzoReader/third_party/honzo
 	url = https://github.com/Nisoku/Honzo.git
-[submodule "Code/PocketMage_EpubReader/third_party/html_parser"]
-	path = Code/PocketMage_EpubReader/third_party/html_parser
+[submodule "Code/HonzoReader/third_party/html_parser"]
+	path = Code/HonzoReader/third_party/html_parser
 	url = https://github.com/NellowTCS/html_parser.git
-[submodule "Code/PocketMage_EpubReader/third_party/md4c"]
-	path = Code/PocketMage_EpubReader/third_party/md4c
+[submodule "Code/HonzoReader/third_party/md4c"]
+	path = Code/HonzoReader/third_party/md4c
 	url = https://github.com/mity/md4c.git
