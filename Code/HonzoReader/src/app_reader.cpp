@@ -75,6 +75,11 @@ public:
         return true;
     }
 
+    std::optional<std::string_view> get_chapter_title(uint32_t idx) {
+        if (!reader_ || idx >= chapter_count_) return std::nullopt;
+        return reader_->get_chunk_alt_text(chap_indices_[idx]);
+    }
+
     std::string get_meta_json() {
         if (!reader_) return {};
         auto result = reader_->get_meta();
@@ -125,24 +130,17 @@ void open_book(const char* filename) {
         }
     }
 
-    // Build TOC from chapter first-headings
+    // Build TOC from chunk alt_text labels
     {
         g_tocCount = 0;
         for (uint16_t ci = 0; ci < g_chapterCount && g_tocCount < 64; ci++) {
-            HonzoChapter hc;
-            if (!s_book.load_chapter(ci, hc)) {
-                // Fallback: generic title
-                snprintf(g_toc[g_tocCount].title, sizeof(g_toc[0].title), "Chapter %u", ci + 1);
-                g_toc[g_tocCount].index = ci;
-                g_tocCount++;
-                continue;
-            }
-            char heading[64];
-            honzo_extract_heading(hc.text, hc.len, hc.markup, heading, sizeof(heading));
-            if (heading[0] == '\0') {
-                snprintf(g_toc[g_tocCount].title, sizeof(g_toc[0].title), "Chapter %u", ci + 1);
+            auto label = s_book.get_chapter_title(ci);
+            if (label.has_value() && !label->empty()) {
+                size_t n = std::min(label->size(), sizeof(g_toc[0].title) - 1);
+                memcpy(g_toc[g_tocCount].title, label->data(), n);
+                g_toc[g_tocCount].title[n] = '\0';
             } else {
-                strncpy(g_toc[g_tocCount].title, heading, sizeof(g_toc[0].title) - 1);
+                snprintf(g_toc[g_tocCount].title, sizeof(g_toc[0].title), "Chapter %u", ci + 1);
             }
             g_toc[g_tocCount].index = ci;
             g_tocCount++;
@@ -186,6 +184,8 @@ void reader_load_chapter(uint16_t chapter) {
 
 // Process keys
 void reader_process_key(char ch) {
+    g_boundaryMsg[0] = '\0';
+
     if (ch == 21) {  // RIGHT -> next page
         if (g_curPage + 1 < g_pagesInChapter) {
             g_curPage++;
@@ -195,6 +195,9 @@ void reader_process_key(char ch) {
             g_curPage = 0;
             reader_load_chapter(g_curChapter);
             saveBookmark();
+            g_needsRedraw = true;
+        } else {
+            strcpy(g_boundaryMsg, "~ end of book ~");
             g_needsRedraw = true;
         }
     } else if (ch == 19) {  // LEFT -> prev page
@@ -207,6 +210,9 @@ void reader_process_key(char ch) {
             g_curPage = g_pagesInChapter > 0 ? g_pagesInChapter - 1 : 0;
             saveBookmark();
             g_needsRedraw = true;
+        } else {
+            strcpy(g_boundaryMsg, "~ at start ~");
+            g_needsRedraw = true;
         }
     } else if (ch == 24) {  // UP -> prev chapter
         if (g_curChapter > 0) {
@@ -215,6 +221,9 @@ void reader_process_key(char ch) {
             reader_load_chapter(g_curChapter);
             saveBookmark();
             g_needsRedraw = true;
+        } else {
+            strcpy(g_boundaryMsg, "~ at start ~");
+            g_needsRedraw = true;
         }
     } else if (ch == 25) {  // DOWN -> next chapter
         if (g_curChapter + 1 < g_chapterCount) {
@@ -222,6 +231,9 @@ void reader_process_key(char ch) {
             g_curPage = 0;
             reader_load_chapter(g_curChapter);
             saveBookmark();
+            g_needsRedraw = true;
+        } else {
+            strcpy(g_boundaryMsg, "~ end of book ~");
             g_needsRedraw = true;
         }
     } else if (ch == 'b') {
@@ -240,6 +252,7 @@ void reader_process_key(char ch) {
         g_jumpBuf[0] = '\0';
         g_appMode = MODE_JUMP;
     } else if (ch == '?') {
+        g_prevMode = g_appMode;
         g_appMode = MODE_HELP;
         g_needsRedraw = true;
     }
@@ -309,6 +322,18 @@ void reader_render() {
     if (g_pagesInChapter > 0) {
         display.setCursor(display.width() - 68, display.height() - 14);
         display.printf("p %d/%d", g_curPage + 1, g_pagesInChapter);
+    }
+
+    // Boundary feedback
+    if (g_boundaryMsg[0]) {
+        int16_t bx1, by1; uint16_t bw, bh;
+        display.getTextBounds(g_boundaryMsg, 0, 0, &bx1, &by1, &bw, &bh);
+        int16_t bx = (display.width() - (int)bw) / 2;
+        int16_t by = display.height() - 20;
+        display.fillRect(bx - 4, by - bh - 2, bw + 8, bh + 6, GxEPD_WHITE);
+        display.drawRect(bx - 4, by - bh - 2, bw + 8, bh + 6, GxEPD_BLACK);
+        display.setCursor(bx, by);
+        display.print(g_boundaryMsg);
     }
 
     EINK().refresh();

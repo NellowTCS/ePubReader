@@ -122,6 +122,8 @@ void library_init() {
     while ((entry = dir.openNextFile()) && g_bookCount < 32) {
         if (!entry.isDirectory()) {
             const char* name = entry.name();
+            // Skip macOS Apple Double metacache
+            if (name[0] == '.' && name[1] == '_') { entry.close(); continue; }
             const char* ext  = strrchr(name, '.');
             if (ext && (strcasecmp(ext, ".hzo") == 0)) {
                 strncpy(g_books[g_bookCount].name, name, sizeof(g_books[0].name) - 1);
@@ -187,6 +189,10 @@ void library_process_key(char ch) {
             saveCurrentBook();
             open_book(g_books[g_selIndex].name);
         }
+    } else if (ch == '?') {
+        g_prevMode = g_appMode;
+        g_appMode = MODE_HELP;
+        g_needsRedraw = true;
     }
 }
 
@@ -212,7 +218,7 @@ void library_render() {
     display.setFont(&FreeSerif9pt8b);
     int y = 38;
     int visStart = max(0, g_selIndex - 8);
-    int visEnd = min(g_bookCount, visStart + 14);
+    int visEnd = min(g_bookCount, visStart + 13);
 
     for (int i = visStart; i < visEnd; i++) {
         if (i == g_selIndex) {
@@ -234,9 +240,9 @@ void library_render() {
     display.setCursor(4, display.height() - 4);
     display.print("< > select  SPC open  FN+< exit");
 
-    if (g_bookCount > 14) {
-        int barH = display.height() - 26;
-        int thumbH = max(barH * 14 / g_bookCount, 6);
+    if (g_bookCount > 13) {
+        int barH = display.height() - 42;
+        int thumbH = max(barH * 13 / g_bookCount, 6);
         int thumbY = 24 + (barH - thumbH) * g_selIndex / max(g_bookCount - 1, 1);
         display.drawFastVLine(display.width() - 4, 24, barH, GxEPD_BLACK);
         display.fillRect(display.width() - 6, thumbY, 4, thumbH, GxEPD_BLACK);

@@ -82,7 +82,7 @@ void processKB_APP() {
         case MODE_READING: reader_process_key(ch);  break;
         case MODE_TOC:     toc_process_key(ch);      break;
         case MODE_JUMP:    jump_process_key(ch);     break;
-        case MODE_HELP:    g_appMode = MODE_READING; g_needsRedraw = true; break;
+        case MODE_HELP:    g_appMode = g_prevMode;   g_needsRedraw = true; break;
     }
 
     updateOLED();

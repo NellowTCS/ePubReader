@@ -60,6 +60,7 @@ struct LayoutPage {
 
 // App globals
 extern AppMode     g_appMode;
+extern AppMode     g_prevMode;
 extern BookEntry   g_books[32];
 extern int         g_bookCount;
 extern int         g_selIndex;
@@ -84,6 +85,7 @@ extern uint8_t     g_jumpLen;
 extern int32_t     g_touchBase;
 extern int32_t     g_scrollAccum;
 extern bool        g_needsRedraw;
+extern char        g_boundaryMsg[32];
 
 // TOC entry
 struct TocEntry {
@@ -124,5 +126,3 @@ void render_chapter_markup(const char* text, size_t len, uint8_t markup);
 void render_page_to_eink(uint16_t pageIdx);
 void updateOLED();
 
-// Metadata helpers
-bool extract_book_meta(const char* full_path, char* title, int titleMax, char* author, int authorMax);

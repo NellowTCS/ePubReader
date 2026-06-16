@@ -33,12 +33,22 @@ void touch_scroll() {
     if (vector > 0) {
         if (g_curPage + 1 < g_pagesInChapter) {
             g_curPage++;
+            g_boundaryMsg[0] = '\0';
+            g_needsRedraw = true;
+            s_lastScrollMs = now;
+        } else if (g_curPage + 1 >= g_pagesInChapter && g_boundaryMsg[0] == '\0') {
+            strcpy(g_boundaryMsg, "~ end of chapter ~");
             g_needsRedraw = true;
             s_lastScrollMs = now;
         }
     } else if (vector < 0) {
         if (g_curPage > 0) {
             g_curPage--;
+            g_boundaryMsg[0] = '\0';
+            g_needsRedraw = true;
+            s_lastScrollMs = now;
+        } else if (g_curPage == 0 && g_boundaryMsg[0] == '\0') {
+            strcpy(g_boundaryMsg, "~ at start of chapter ~");
             g_needsRedraw = true;
             s_lastScrollMs = now;
         }

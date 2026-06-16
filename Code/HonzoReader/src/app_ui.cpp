@@ -5,17 +5,17 @@
 
 // TOC overlay
 void toc_process_key(char ch) {
-    if (ch == 25) {  // DOWN
+    if (ch == 25 || ch == 21) {  // DOWN or RIGHT -> next
         if (g_tocScroll < g_tocCount - 1) {
             g_tocScroll++;
             g_needsRedraw = true;
         }
-    } else if (ch == 24) {  // UP
+    } else if (ch == 24 || ch == 19) {  // UP or LEFT -> prev
         if (g_tocScroll > 0) {
             g_tocScroll--;
             g_needsRedraw = true;
         }
-    } else if (ch == 21) {  // RIGHT -> go to selected chapter
+    } else if (ch == 32 || ch == 13) {  // Space or Enter -> go to selected chapter
         if (g_tocCount > 0 && g_tocScroll < g_tocCount) {
             uint16_t targetIdx = g_toc[g_tocScroll].index;
             if (targetIdx != g_curChapter) {
@@ -27,7 +27,7 @@ void toc_process_key(char ch) {
             g_appMode = MODE_READING;
             g_needsRedraw = true;
         }
-    } else if (ch == 19 || ch == 27) {  // LEFT or ESC -> back to reading
+    } else if (ch == 27) {  // ESC -> back to reading
         g_appMode = MODE_READING;
         g_needsRedraw = true;
     }
@@ -75,7 +75,7 @@ void toc_render() {
     display.setTextColor(GxEPD_BLACK);
     display.setFont(&Font5x7Fixed);
     display.setCursor(4, display.height() - 4);
-    display.print("< > browse  RIGHT open  ESC back  FN+< exit");
+    display.print("Arrow keys browse  Enter open  ESC back  FN+< exit");
 
     EINK().refresh();
 }
@@ -107,7 +107,7 @@ void jump_render() {
     // Overlay on top of current page
     render_page_to_eink(g_curPage);
 
-    int16_t dw = 280, dh = 80;
+    int16_t dw = 280, dh = 100;
     int16_t dx = (display.width() - dw) / 2;
     int16_t dy = (display.height() - dh) / 2 - 10;
 
@@ -116,14 +116,14 @@ void jump_render() {
 
     display.setFont(&FreeSerifBold12pt8b);
     display.setTextColor(GxEPD_BLACK);
-    display.setCursor(dx + 8, dy + 20);
-    display.print("Jump to page");
+    display.setCursor(dx + 12, dy + 24);
+    display.print("Jump to Page");
 
     display.setFont(&FreeSerif9pt8b);
-    display.setCursor(dx + 8, dy + 48);
-    display.printf("Page (1-%d): ", g_pagesInChapter);
+    display.setCursor(dx + 12, dy + 52);
+    display.printf("Page (1-%u): ", g_pageCount);
     if (g_jumpLen > 0) {
-        display.setCursor(dx + 8, dy + 70);
+        display.setCursor(dx + 12, dy + 80);
         display.print(g_jumpBuf);
     }
 

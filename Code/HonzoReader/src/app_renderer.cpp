@@ -11,9 +11,9 @@ static U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
 
 // CONSTANTS
 static constexpr int16_t MARGIN_X = 8;
-static constexpr int16_t MARGIN_Y = 24;
+static constexpr int16_t MARGIN_Y = 36;
 static constexpr int16_t USABLE_W = 304;
-static constexpr int16_t USABLE_H = 200;
+static constexpr int16_t USABLE_H = 230;
 static constexpr int16_t PAGE_LINE_H = 13;
 static constexpr int MAX_PAGES = 32;
 static constexpr int MAX_RUNS_TOTAL = 2048;

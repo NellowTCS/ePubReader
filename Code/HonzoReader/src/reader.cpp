@@ -1,6 +1,7 @@
 #include "reader.h"
 
 AppMode     g_appMode       = MODE_LIBRARY;
+AppMode     g_prevMode      = MODE_LIBRARY;
 BookEntry   g_books[32]     = {};
 int         g_bookCount     = 0;
 int         g_selIndex      = 0;
@@ -29,3 +30,4 @@ uint8_t     g_jumpLen       = 0;
 int32_t     g_touchBase     = 0;
 int32_t     g_scrollAccum   = 0;
 bool        g_needsRedraw   = false;
+char        g_boundaryMsg[32] = {};
