@@ -10,3 +10,6 @@
 [submodule "Code/HonzoReader/lib/third_party/md4c"]
 	path = Code/HonzoReader/lib/third_party/md4c
 	url = https://github.com/NellowTCS/md4c.git
+[submodule "Code/PocketMage_V3/lib/third_party/U8g2_for_Adafruit_GFX"]
+	path = Code/PocketMage_V3/lib/third_party/U8g2_for_Adafruit_GFX
+	url = https://github.com/NellowTCS/U8g2_for_Adafruit_GFX.git
