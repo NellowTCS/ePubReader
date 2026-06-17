@@ -107,6 +107,8 @@ Many other commands can be done from the homescreen, including all of the settin
 - **(FN) + ( > )** | Save document
 - **(FN) + ( o )** | Enter filesystem (loading files)
 - **(SHFT) + ( o )** | New blank text document
+- **(FN) + (TAB)** | Cycle font family (SERIF / SANS / MONO)
+- **(FN) + (SHFT) + ( o )** | Jump to a specific line number
 - **(FN) + (Key)** | FN layer keymapping (legends on the PCB)
 - **(SHFT) + (key)** | Capital letter
 - **(ENTER)** | Create a new line
