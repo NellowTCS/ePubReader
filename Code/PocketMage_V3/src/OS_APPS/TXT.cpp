@@ -79,7 +79,7 @@ inline uint16_t getFastCharHeight(const uint8_t* font) {
 
 // Font setup
 enum FontFamily { serif = 0, sans = 1, mono = 2 };
-uint8_t fontStyle = sans;
+volatile uint8_t fontStyle = sans;
 
 struct FontMap {
   const uint8_t* normal;
@@ -960,16 +960,9 @@ void cycleParagraphStyle(ulong& currLine, uint16_t& cursor) {
   updateScreen = true;
 }
 
-void setFontOLED(bool bold, bool italic) {
-  if (bold && italic)
-    u8g2.setFont(u8g2_font_luBIS18_tf);  
-  else if (bold && !italic)
-    u8g2.setFont(u8g2_font_luBS18_tf);  
-  else if (!bold && italic)
-    u8g2.setFont(u8g2_font_luIS18_tf);  
-  else
-    u8g2.setFont(u8g2_font_lubR18_tf);  
-  return;
+void setFontOLED(char style, bool bold, bool italic) {
+  const uint8_t* font = pickFont(style, bold, italic);
+  u8g2.setFont(font);
 }
 
 void toolBar(Line& line, bool bold, bool italic) {
@@ -1015,19 +1008,18 @@ void toolBar(Line& line, bool bold, bool italic) {
     u8g2.drawStr(0, u8g2.getDisplayHeight(), lineTypeLabel.c_str());
   }
 
-  if (bold == true && italic == true) {
-    u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getStrWidth("BOLD+ITALIC"), u8g2.getDisplayHeight(),
-                 "BOLD+ITALIC");
-  } else if (bold == true && italic == false) {
-    u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getStrWidth("BOLD"), u8g2.getDisplayHeight(),
-                 "BOLD");
-  } else if (bold == false && italic == true) {
-    u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getStrWidth("ITALIC"), u8g2.getDisplayHeight(),
-                 "ITALIC");
-  } else {
-    u8g2.drawStr(u8g2.getDisplayWidth() - u8g2.getStrWidth("NORMAL"), u8g2.getDisplayHeight(),
-                 "NORMAL");
-  }
+  uint16_t dw = u8g2.getDisplayWidth();
+
+  static const char* fontShortLabels[] = {"SER", "SAN", "MON"};
+  String styleLabel;
+  if (bold && italic) styleLabel = "BOLD+ITALIC";
+  else if (bold)      styleLabel = "BOLD";
+  else if (italic)    styleLabel = "ITALIC";
+  else                styleLabel = "NORMAL";
+
+  String fontAndStyle = String(fontShortLabels[fontStyle]) + " " + styleLabel;
+  u8g2.drawStr(dw - u8g2.getStrWidth(fontAndStyle.c_str()), u8g2.getDisplayHeight(),
+               fontAndStyle.c_str());
 }
 
 uint8_t getFastOledCharWidth(uint16_t unicode, bool bold, bool italic, bool isTiny);
@@ -1436,12 +1428,15 @@ void newMarkdownFile(const String& path) {
 static uint8_t oled_char_widths[5][256] = {0};
 static bool oled_widths_cached = false;
 
+static uint8_t cachedFontStyle = 0xFF;
+
 inline void initOledWidthCache() {
-  if (oled_widths_cached) return;
+  if (oled_widths_cached && cachedFontStyle == fontStyle) return;
+  cachedFontStyle = fontStyle;
+  oled_widths_cached = false;
   char temp[3] = {0, 0, 0};
   
   for (int i = 32; i < 256; i++) {
-    // Pack index 'i' into proper UTF-8 format for u8g2 to measure
     if (i < 128) {
        temp[0] = i; temp[1] = 0;
     } else {
@@ -1450,16 +1445,16 @@ inline void initOledWidthCache() {
        temp[2] = 0;
     }
     
-    u8g2.setFont(u8g2_font_lubR18_tf);
+    u8g2.setFont(pickFont('T', false, false));
     oled_char_widths[0][i] = u8g2.getUTF8Width(temp);
     
-    u8g2.setFont(u8g2_font_luBS18_tf);
+    u8g2.setFont(pickFont('T', true, false));
     oled_char_widths[1][i] = u8g2.getUTF8Width(temp);
     
-    u8g2.setFont(u8g2_font_luIS18_tf);
+    u8g2.setFont(pickFont('T', false, true));
     oled_char_widths[2][i] = u8g2.getUTF8Width(temp);
     
-    u8g2.setFont(u8g2_font_luBIS18_tf);
+    u8g2.setFont(pickFont('T', true, true));
     oled_char_widths[3][i] = u8g2.getUTF8Width(temp);
     
     u8g2.setFont(u8g2_font_5x7_tf);
@@ -1578,7 +1573,7 @@ void editorOledDisplay(Line& line, uint16_t cursor_pos, bool currentlyTyping) {
       if (xpos + w >= 0 && xpos <= display_w) u8g2.drawGlyph(xpos, 8, '`'); 
       xpos += w;
     } else {
-      setFontOLED(bold, italic);
+      setFontOLED(line.type, bold, italic);
       int char_w = getFastOledCharWidth(unicode, bold, italic, false);
 
       if (xpos + char_w >= 0 && xpos <= display_w) {
@@ -1834,21 +1829,33 @@ void editor(char inchar) {
 
     else if (inchar == 24) cursor_pos = 0;
     else if (inchar == 26) cursor_pos = document.lines[currentLineNum].len;
-    else if (inchar == 25) {}
-
-    // TAB / SHIFT+TAB
-    else if (inchar == 9 || inchar == 14) {
-      if (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT || inchar == 14) {
-        if (cursor_pos == 0) {
-          if (currentLineNum > 0) {
-            currentLineNum--;
-            cursor_pos = document.lines[currentLineNum].len;
-            updateScreen = true;
+    else if (inchar == 25) {
+      KB().setKeyboardState(FUNC);
+      {
+        String cmd = textPrompt("GOTO LINE:");
+        if (cmd != "_RETURN_" && cmd != "_EXIT_") {
+          int line = atoi(cmd.c_str());
+          if (line >= 0 && line < document.lineCount) {
+            currentLineNum = line;
+          } else if (line < 0) {
+            currentLineNum = 0;
+          } else {
+            currentLineNum = document.lineCount - 1;
           }
-        } else {
-          while (cursor_pos > 0 && document.lines[currentLineNum].text[cursor_pos - 1] == ' ') cursor_pos--;
-          while (cursor_pos > 0 && document.lines[currentLineNum].text[cursor_pos - 1] != ' ') cursor_pos--;
+          cursor_pos = document.lines[currentLineNum].len;
+          updateScreen = true;
         }
+      }
+      KB().setKeyboardState(NORMAL);
+    }
+
+    // TAB (forward word nav) / FN+TAB (font selector)
+    else if (inchar == 9) {
+      if (KB().getKeyboardState() == FUNC) {
+        fontStyle = (fontStyle + 1) % 3;
+        static const char* fontLabels[] = {"SERIF", "SANS", "MONO"};
+        OLED().sysMessage(fontLabels[fontStyle], 1200);
+        updateScreen = true;
       } else {
         if (cursor_pos >= line.len) {
           if (currentLineNum < document.lineCount - 1) {
@@ -1860,6 +1867,20 @@ void editor(char inchar) {
           while (cursor_pos < line.len && document.lines[currentLineNum].text[cursor_pos] != ' ') cursor_pos++;
           while (cursor_pos < line.len && document.lines[currentLineNum].text[cursor_pos] == ' ') cursor_pos++;
         }
+      }
+    }
+
+    // SHIFT+TAB (backward word nav)
+    else if (inchar == 14) {
+      if (cursor_pos == 0) {
+        if (currentLineNum > 0) {
+          currentLineNum--;
+          cursor_pos = document.lines[currentLineNum].len;
+          updateScreen = true;
+        }
+      } else {
+        while (cursor_pos > 0 && document.lines[currentLineNum].text[cursor_pos - 1] == ' ') cursor_pos--;
+        while (cursor_pos > 0 && document.lines[currentLineNum].text[cursor_pos - 1] != ' ') cursor_pos--;
       }
     }
 
