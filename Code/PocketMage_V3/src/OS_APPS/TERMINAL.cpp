@@ -1582,7 +1582,8 @@ void processKB_TERMINAL() {
 
       ulong maxS = (ulong)maxScroll;
       // Handle Terminal Hardware Scrolling
-      if (TOUCH().updateScroll(maxS, termScrollIndex)) {
+      int scrollStepT = (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) ? 5 : 1;
+      if (TOUCH().updateScroll(maxS, termScrollIndex, scrollStepT)) {
         newState = true;
       }
 
@@ -1662,7 +1663,8 @@ void processKB_TERMINAL() {
       }
 
       // update scroll (Independent of keyboard debounce)
-      if (TOUCH().updateScroll(potionLines.size() - 1, currentPotionLine)) {
+      int scrollStepP = (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) ? 5 : 1;
+      if (TOUCH().updateScroll(potionLines.size() - 1, currentPotionLine, scrollStepP)) {
         // Put cursor at the end
         cursor_pos = potionLines[currentPotionLine].length();
         newState = true;
