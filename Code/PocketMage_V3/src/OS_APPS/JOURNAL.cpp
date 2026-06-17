@@ -43,7 +43,7 @@ void drawJMENU() {
   delay(50);
 
   // Display background
-  display.setTextColor(GxEPD_BLACK);
+  u8g2f.setForegroundColor(GxEPD_BLACK);
   EINK().drawStatusBar("Choose (D)ate or (T)oday");
   display.drawBitmap(0, 0, _journal, 320, 218, GxEPD_BLACK);
 

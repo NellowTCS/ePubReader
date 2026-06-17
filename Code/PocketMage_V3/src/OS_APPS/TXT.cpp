@@ -10,43 +10,6 @@
 #if !OTA_APP  // POCKETMAGE_OS
 static constexpr const char* TAG = "TXT_NEW";
 
-#pragma region Font includes
-// Mono
-#include <Fonts/FreeMono9pt8b.h>
-#include <Fonts/FreeMonoBold12pt8b.h>
-#include <Fonts/FreeMonoBold18pt8b.h>
-#include <Fonts/FreeMonoBold24pt8b.h>
-#include <Fonts/FreeMonoBold9pt8b.h>
-#include <Fonts/FreeMonoBoldOblique12pt8b.h>
-#include <Fonts/FreeMonoBoldOblique18pt8b.h>
-#include <Fonts/FreeMonoBoldOblique24pt8b.h>
-#include <Fonts/FreeMonoBoldOblique9pt8b.h>
-#include <Fonts/FreeMonoOblique9pt8b.h>
-
-// Serif
-#include <Fonts/FreeSerif9pt8b.h>
-#include <Fonts/FreeSerifBold12pt8b.h>
-#include <Fonts/FreeSerifBold18pt8b.h>
-#include <Fonts/FreeSerifBold24pt8b.h>
-#include <Fonts/FreeSerifBold9pt8b.h>
-#include <Fonts/FreeSerifBoldItalic12pt8b.h>
-#include <Fonts/FreeSerifBoldItalic18pt8b.h>
-#include <Fonts/FreeSerifBoldItalic24pt8b.h>
-#include <Fonts/FreeSerifBoldItalic9pt8b.h>
-#include <Fonts/FreeSerifItalic9pt8b.h>
-
-// Sans
-#include <Fonts/FreeSans9pt8b.h>
-#include <Fonts/FreeSansBold12pt8b.h>
-#include <Fonts/FreeSansBold18pt8b.h>
-#include <Fonts/FreeSansBold24pt8b.h>
-#include <Fonts/FreeSansBold9pt8b.h>
-#include <Fonts/FreeSansBoldOblique12pt8b.h>
-#include <Fonts/FreeSansBoldOblique18pt8b.h>
-#include <Fonts/FreeSansBoldOblique24pt8b.h>
-#include <Fonts/FreeSansBoldOblique9pt8b.h>
-#include <Fonts/FreeSansOblique9pt8b.h>
-
 #include "esp32-hal-log.h"
 #include "esp_log.h"
 
@@ -63,7 +26,6 @@ TXTState_NEW CurrentTXTState_NEW = TXT_;
 #define NORMAL_LINE_PADDING 2
 
 #pragma region Fonts
-#include <gfxfont.h>
 
 // --- UTF-8 Decoding System ---
 inline uint16_t decodeUTF8(const char* str, uint16_t* index, uint16_t len) {
@@ -86,33 +48,31 @@ inline uint16_t decodeUTF8(const char* str, uint16_t* index, uint16_t len) {
   return c; // Fallback
 }
 
-// Maps standard Unicode points to your custom font's 0x20-0xDF format
-inline uint8_t mapUnicodeToFontIndex(uint16_t unicode) {
-  if (unicode < 0x80) return unicode;
-  if (unicode >= 0x00A0 && unicode <= 0x00FF) return unicode - 0x20;
-  return 0x7F; // Replacement character for unsupported glyphs like 'ł' (U+0142)
-}
-
-// Fast character width lookup (Modified for mapped 8-bit glyphs)
-inline uint16_t getFastCharWidth(uint8_t c, const GFXfont* font) {
-  if (!font) return 6; // Fallback for default 5x7 font
-  if (c == ' ') c = 'n'; 
-  
-  if (c >= pgm_read_byte(&font->first) && c <= pgm_read_byte(&font->last)) {
-    GFXglyph *glyph = &(((GFXglyph *)pgm_read_ptr(&font->glyph))[c - pgm_read_byte(&font->first)]);
-    return pgm_read_byte(&glyph->width); 
+// Fast character width lookup via u8g2 bridge
+inline uint16_t getFastCharWidth(uint16_t unicode, const uint8_t* font) {
+  if (!font) return 6;
+  u8g2f.setFont(font);
+  char tmp[5];
+  if (unicode < 0x80) {
+    tmp[0] = unicode; tmp[1] = 0;
+  } else if (unicode < 0x800) {
+    tmp[0] = 0xC0 | (unicode >> 6);
+    tmp[1] = 0x80 | (unicode & 0x3F);
+    tmp[2] = 0;
+  } else {
+    tmp[0] = 0xE0 | (unicode >> 12);
+    tmp[1] = 0x80 | ((unicode >> 6) & 0x3F);
+    tmp[2] = 0x80 | (unicode & 0x3F);
+    tmp[3] = 0;
   }
-  return 0; 
+  return u8g2f.getUTF8Width(tmp);
 }
 
-// Fast line height lookup 
-inline uint16_t getFastCharHeight(const GFXfont* font) {
+// Fast line height lookup via u8g2 bridge
+inline uint16_t getFastCharHeight(const uint8_t* font) {
   if (!font) return 8;
-  if ('A' >= pgm_read_byte(&font->first) && 'A' <= pgm_read_byte(&font->last)) {
-    GFXglyph *glyph = &(((GFXglyph *)pgm_read_ptr(&font->glyph))['A' - pgm_read_byte(&font->first)]);
-    return pgm_read_byte(&glyph->height);
-  }
-  return pgm_read_byte(&font->yAdvance) / 2;
+  u8g2f.setFont(font);
+  return u8g2f.getFontAscent() - u8g2f.getFontDescent();
 }
 
 // Font setup
@@ -120,40 +80,40 @@ enum FontFamily { serif = 0, sans = 1, mono = 2 };
 uint8_t fontStyle = sans;
 
 struct FontMap {
-  const GFXfont* normal;
-  const GFXfont* normal_B;
-  const GFXfont* normal_I;
-  const GFXfont* normal_BI;
+  const uint8_t* normal;
+  const uint8_t* normal_B;
+  const uint8_t* normal_I;
+  const uint8_t* normal_BI;
 
-  const GFXfont* h1;
-  const GFXfont* h1_B;
-  const GFXfont* h1_I;
-  const GFXfont* h1_BI;
+  const uint8_t* h1;
+  const uint8_t* h1_B;
+  const uint8_t* h1_I;
+  const uint8_t* h1_BI;
 
-  const GFXfont* h2;
-  const GFXfont* h2_B;
-  const GFXfont* h2_I;
-  const GFXfont* h2_BI;
+  const uint8_t* h2;
+  const uint8_t* h2_B;
+  const uint8_t* h2_I;
+  const uint8_t* h2_BI;
 
-  const GFXfont* h3;
-  const GFXfont* h3_B;
-  const GFXfont* h3_I;
-  const GFXfont* h3_BI;
+  const uint8_t* h3;
+  const uint8_t* h3_B;
+  const uint8_t* h3_I;
+  const uint8_t* h3_BI;
 
-  const GFXfont* code;
-  const GFXfont* code_B;
-  const GFXfont* code_I;
-  const GFXfont* code_BI;
+  const uint8_t* code;
+  const uint8_t* code_B;
+  const uint8_t* code_I;
+  const uint8_t* code_BI;
 
-  const GFXfont* quote;
-  const GFXfont* quote_B;
-  const GFXfont* quote_I;
-  const GFXfont* quote_BI;
+  const uint8_t* quote;
+  const uint8_t* quote_B;
+  const uint8_t* quote_I;
+  const uint8_t* quote_BI;
 
-  const GFXfont* list;
-  const GFXfont* list_B;
-  const GFXfont* list_I;
-  const GFXfont* list_BI;
+  const uint8_t* list;
+  const uint8_t* list_B;
+  const uint8_t* list_I;
+  const uint8_t* list_BI;
 };
 
 FontMap fonts[3];
@@ -221,7 +181,7 @@ void initDocMemory() {
 
 #pragma region Editor Helpers
 // Helpers
-const GFXfont* pickFont(char style, bool bold, bool italic) {
+const uint8_t* pickFont(char style, bool bold, bool italic) {
   FontMap& fm = fonts[fontStyle];  
 
   switch (style) {
@@ -293,7 +253,7 @@ uint16_t getLineMaxHeight(Line& line) {
     }
   }
 
-  const GFXfont* font;
+  const uint8_t* font;
   if (boldItalicExists) font = pickFont(line.type, true, true);
   else if (boldExists) font = pickFont(line.type, true, false);
   else if (italicExists) font = pickFont(line.type, false, true);
@@ -339,7 +299,7 @@ int drawLineEink(Document& doc, ulong lineIndex, int startX, int startY, bool is
     display.fillRect(0, startY, display.width(), hpx, bgColor);
   }
 
-  display.setTextColor(fgColor);
+  u8g2f.setForegroundColor(fgColor);
 
   if (style == 'H') {
     display.drawFastHLine(0, cursorY + 3, display.width(), fgColor);
@@ -385,16 +345,12 @@ int drawLineEink(Document& doc, ulong lineIndex, int startX, int startY, bool is
       continue;
     }
 
-    const GFXfont* font = pickFont(style, bold, italic);
-    display.setFont(font);
+    const uint8_t* font = pickFont(style, bold, italic);
+    u8g2f.setFont(font);
 
-    // Map Unicode code point to the 8-bit glyph index in the custom font
-    uint8_t mappedChar = mapUnicodeToFontIndex(unicode);
+    u8g2f.drawGlyph(xpos, baselineY, unicode);
 
-    display.setCursor(xpos, baselineY); 
-    display.write(mappedChar); // Write natively supports raw glyph indices
-
-    xpos += getFastCharWidth(mappedChar, font);
+    xpos += getFastCharWidth(unicode, font);
   }
 
   // ---------- Post-Render Formatting ---------- //
@@ -434,14 +390,12 @@ int drawLineEink(Document& doc, ulong lineIndex, int startX, int startY, bool is
     }
 
     String numStr = String(listNum) + ".";
-    display.setFont(pickFont('O', false, false)); 
+    u8g2f.setFont(pickFont('O', false, false));
     
-    int16_t nx, ny;
-    uint16_t nw, nh;
-    display.getTextBounds(numStr, 0, 0, &nx, &ny, &nw, &nh);
+    int nw = u8g2f.getUTF8Width(numStr.c_str());
     
-    display.setCursor(startX - nw - 8, baselineY);
-    display.print(numStr);
+    u8g2f.setCursor(startX - nw - 8, baselineY);
+    u8g2f.print(numStr);
   }
 
   return hpx; 
@@ -508,12 +462,10 @@ int getLineEinkWidth(Line& line) {
       continue; 
     }
 
-    // Determine active font and map to your custom 8-bit glyph index
-    const GFXfont* font = pickFont(style, bold, italic);
-    uint8_t mappedChar = mapUnicodeToFontIndex(unicode);
+    // Determine active font and measure glyph width
+    const uint8_t* font = pickFont(style, bold, italic);
 
-    // Add the exact pixel width of this specific character
-    width += getFastCharWidth(mappedChar, font);
+    width += getFastCharWidth(unicode, font);
   }
 
   // 3. Account for the structural right-side padding (Code blocks have right-side borders)
@@ -535,7 +487,7 @@ int findWrapIndex(const String& content, int startIndex, char style) {
   int lastSpaceIndex = -1;
 
   int maxLen = min((int)(content.length() - startIndex), (int)LINE_CAP);
-  const GFXfont* activeFont = pickFont(style, bold, italic);
+  const uint8_t* activeFont = pickFont(style, bold, italic);
 
   uint16_t i = 0;
   while (i < maxLen) {
@@ -558,8 +510,7 @@ int findWrapIndex(const String& content, int startIndex, char style) {
       continue; 
     }
 
-    uint8_t mappedChar = mapUnicodeToFontIndex(unicode);
-    currentWidth += getFastCharWidth(mappedChar, activeFont);
+    currentWidth += getFastCharWidth(unicode, activeFont);
 
     if (currentWidth > availableWidth) {
       if (lastSpaceIndex > 0) return lastSpaceIndex;
@@ -1914,113 +1865,113 @@ void editor(char inchar) {
 
 #pragma region INIT
 void initFonts() {
-  // Mono
-  fonts[mono].normal = &FreeMono9pt8b;
-  fonts[mono].normal_B = &FreeMonoBold9pt8b;
-  fonts[mono].normal_I = &FreeMonoOblique9pt8b;
-  fonts[mono].normal_BI = &FreeMonoBoldOblique9pt8b;
+  // Mono (Courier)
+  fonts[mono].normal  = u8g2_font_courR10_tf;
+  fonts[mono].normal_B = u8g2_font_courB10_tf;
+  fonts[mono].normal_I = u8g2_font_courR10_tf;
+  fonts[mono].normal_BI = u8g2_font_courB10_tf;
 
-  fonts[mono].h1 = &FreeMonoBold24pt8b;
-  fonts[mono].h1_B = &FreeMonoBold24pt8b;  // Already bold
-  fonts[mono].h1_I = &FreeMonoBoldOblique24pt8b;
-  fonts[mono].h1_BI = &FreeMonoBoldOblique24pt8b;
+  fonts[mono].h1   = u8g2_font_courB24_tf;
+  fonts[mono].h1_B = u8g2_font_courB24_tf;
+  fonts[mono].h1_I = u8g2_font_courB24_tf;
+  fonts[mono].h1_BI = u8g2_font_courB24_tf;
 
-  fonts[mono].h2 = &FreeMonoBold18pt8b;
-  fonts[mono].h2_B = &FreeMonoBold18pt8b;
-  fonts[mono].h2_I = &FreeMonoBoldOblique18pt8b;
-  fonts[mono].h2_BI = &FreeMonoBoldOblique18pt8b;
+  fonts[mono].h2   = u8g2_font_courB18_tf;
+  fonts[mono].h2_B = u8g2_font_courB18_tf;
+  fonts[mono].h2_I = u8g2_font_courB18_tf;
+  fonts[mono].h2_BI = u8g2_font_courB18_tf;
 
-  fonts[mono].h3 = &FreeMonoBold12pt8b;
-  fonts[mono].h3_B = &FreeMonoBold12pt8b;
-  fonts[mono].h3_I = &FreeMonoBoldOblique12pt8b;
-  fonts[mono].h3_BI = &FreeMonoBoldOblique12pt8b;
+  fonts[mono].h3   = u8g2_font_courB12_tf;
+  fonts[mono].h3_B = u8g2_font_courB12_tf;
+  fonts[mono].h3_I = u8g2_font_courB12_tf;
+  fonts[mono].h3_BI = u8g2_font_courB12_tf;
 
-  fonts[mono].code = &FreeMono9pt8b;
-  fonts[mono].code_B = &FreeMono9pt8b;
-  fonts[mono].code_I = &FreeMono9pt8b;
-  fonts[mono].code_BI = &FreeMono9pt8b;
+  fonts[mono].code   = u8g2_font_courR10_tf;
+  fonts[mono].code_B = u8g2_font_courR10_tf;
+  fonts[mono].code_I = u8g2_font_courR10_tf;
+  fonts[mono].code_BI = u8g2_font_courR10_tf;
 
-  fonts[mono].quote = &FreeMono9pt8b;
-  fonts[mono].quote_B = &FreeMonoBold9pt8b;
-  fonts[mono].quote_I = &FreeMonoOblique9pt8b;
-  fonts[mono].quote_BI = &FreeMonoBoldOblique9pt8b;
+  fonts[mono].quote   = u8g2_font_courR10_tf;
+  fonts[mono].quote_B = u8g2_font_courB10_tf;
+  fonts[mono].quote_I = u8g2_font_courR10_tf;
+  fonts[mono].quote_BI = u8g2_font_courB10_tf;
 
-  fonts[mono].list = &FreeMono9pt8b;
-  fonts[mono].list_B = &FreeMonoBold9pt8b;
-  fonts[mono].list_I = &FreeMonoOblique9pt8b;
-  fonts[mono].list_BI = &FreeMonoBoldOblique9pt8b;
+  fonts[mono].list   = u8g2_font_courR10_tf;
+  fonts[mono].list_B = u8g2_font_courB10_tf;
+  fonts[mono].list_I = u8g2_font_courR10_tf;
+  fonts[mono].list_BI = u8g2_font_courB10_tf;
 
-  // Serif
-  fonts[serif].normal = &FreeSerif9pt8b;
-  fonts[serif].normal_B = &FreeSerifBold9pt8b;
-  fonts[serif].normal_I = &FreeSerifItalic9pt8b;
-  fonts[serif].normal_BI = &FreeSerifBoldItalic9pt8b;
+  // Serif (New Century Schoolbook)
+  fonts[serif].normal  = u8g2_font_ncenR10_tf;
+  fonts[serif].normal_B = u8g2_font_ncenB10_tf;
+  fonts[serif].normal_I = u8g2_font_ncenR10_tf;
+  fonts[serif].normal_BI = u8g2_font_ncenB10_tf;
 
-  fonts[serif].h1 = &FreeSerifBold24pt8b;
-  fonts[serif].h1_B = &FreeSerifBold24pt8b;
-  fonts[serif].h1_I = &FreeSerifBoldItalic24pt8b;
-  fonts[serif].h1_BI = &FreeSerifBoldItalic24pt8b;
+  fonts[serif].h1   = u8g2_font_ncenB24_tf;
+  fonts[serif].h1_B = u8g2_font_ncenB24_tf;
+  fonts[serif].h1_I = u8g2_font_ncenB24_tf;
+  fonts[serif].h1_BI = u8g2_font_ncenB24_tf;
 
-  fonts[serif].h2 = &FreeSerifBold18pt8b;
-  fonts[serif].h2_B = &FreeSerifBold18pt8b;
-  fonts[serif].h2_I = &FreeSerifBoldItalic18pt8b;
-  fonts[serif].h2_BI = &FreeSerifBoldItalic18pt8b;
+  fonts[serif].h2   = u8g2_font_ncenB18_tf;
+  fonts[serif].h2_B = u8g2_font_ncenB18_tf;
+  fonts[serif].h2_I = u8g2_font_ncenB18_tf;
+  fonts[serif].h2_BI = u8g2_font_ncenB18_tf;
 
-  fonts[serif].h3 = &FreeSerifBold12pt8b;
-  fonts[serif].h3_B = &FreeSerifBold12pt8b;
-  fonts[serif].h3_I = &FreeSerifBoldItalic12pt8b;
-  fonts[serif].h3_BI = &FreeSerifBoldItalic12pt8b;
+  fonts[serif].h3   = u8g2_font_ncenB12_tf;
+  fonts[serif].h3_B = u8g2_font_ncenB12_tf;
+  fonts[serif].h3_I = u8g2_font_ncenB12_tf;
+  fonts[serif].h3_BI = u8g2_font_ncenB12_tf;
 
-  fonts[serif].code = &FreeMono9pt8b;
-  fonts[serif].code_B = &FreeMono9pt8b;
-  fonts[serif].code_I = &FreeMono9pt8b;
-  fonts[serif].code_BI = &FreeMono9pt8b;
+  fonts[serif].code   = u8g2_font_courR10_tf;
+  fonts[serif].code_B = u8g2_font_courR10_tf;
+  fonts[serif].code_I = u8g2_font_courR10_tf;
+  fonts[serif].code_BI = u8g2_font_courR10_tf;
 
-  fonts[serif].quote = &FreeSerif9pt8b;
-  fonts[serif].quote_B = &FreeSerifBold9pt8b;
-  fonts[serif].quote_I = &FreeSerifItalic9pt8b;
-  fonts[serif].quote_BI = &FreeSerifBoldItalic9pt8b;
+  fonts[serif].quote   = u8g2_font_ncenR10_tf;
+  fonts[serif].quote_B = u8g2_font_ncenB10_tf;
+  fonts[serif].quote_I = u8g2_font_ncenR10_tf;
+  fonts[serif].quote_BI = u8g2_font_ncenB10_tf;
 
-  fonts[serif].list = &FreeSerif9pt8b;
-  fonts[serif].list_B = &FreeSerifBold9pt8b;
-  fonts[serif].list_I = &FreeSerifItalic9pt8b;
-  fonts[serif].list_BI = &FreeSerifBoldItalic9pt8b;
+  fonts[serif].list   = u8g2_font_ncenR10_tf;
+  fonts[serif].list_B = u8g2_font_ncenB10_tf;
+  fonts[serif].list_I = u8g2_font_ncenR10_tf;
+  fonts[serif].list_BI = u8g2_font_ncenB10_tf;
 
-  // Sans
-  fonts[sans].normal = &FreeSans9pt8b;
-  fonts[sans].normal_B = &FreeSansBold9pt8b;
-  fonts[sans].normal_I = &FreeSansOblique9pt8b;
-  fonts[sans].normal_BI = &FreeSansBoldOblique9pt8b;
+  // Sans (Helvetica)
+  fonts[sans].normal  = u8g2_font_helvR10_tf;
+  fonts[sans].normal_B = u8g2_font_helvB10_tf;
+  fonts[sans].normal_I = u8g2_font_helvR10_tf;
+  fonts[sans].normal_BI = u8g2_font_helvB10_tf;
 
-  fonts[sans].h1 = &FreeSansBold24pt8b;
-  fonts[sans].h1_B = &FreeSansBold24pt8b;
-  fonts[sans].h1_I = &FreeSansBoldOblique24pt8b;
-  fonts[sans].h1_BI = &FreeSansBoldOblique24pt8b;
+  fonts[sans].h1   = u8g2_font_helvB24_tf;
+  fonts[sans].h1_B = u8g2_font_helvB24_tf;
+  fonts[sans].h1_I = u8g2_font_helvB24_tf;
+  fonts[sans].h1_BI = u8g2_font_helvB24_tf;
 
-  fonts[sans].h2 = &FreeSansBold18pt8b;
-  fonts[sans].h2_B = &FreeSansBold18pt8b;
-  fonts[sans].h2_I = &FreeSansBoldOblique18pt8b;
-  fonts[sans].h2_BI = &FreeSansBoldOblique18pt8b;
+  fonts[sans].h2   = u8g2_font_helvB18_tf;
+  fonts[sans].h2_B = u8g2_font_helvB18_tf;
+  fonts[sans].h2_I = u8g2_font_helvB18_tf;
+  fonts[sans].h2_BI = u8g2_font_helvB18_tf;
 
-  fonts[sans].h3 = &FreeSansBold12pt8b;
-  fonts[sans].h3_B = &FreeSansBold12pt8b;
-  fonts[sans].h3_I = &FreeSansBoldOblique12pt8b;
-  fonts[sans].h3_BI = &FreeSansBoldOblique12pt8b;
+  fonts[sans].h3   = u8g2_font_helvB12_tf;
+  fonts[sans].h3_B = u8g2_font_helvB12_tf;
+  fonts[sans].h3_I = u8g2_font_helvB12_tf;
+  fonts[sans].h3_BI = u8g2_font_helvB12_tf;
 
-  fonts[sans].code = &FreeMono9pt8b;
-  fonts[sans].code_B = &FreeMono9pt8b;
-  fonts[sans].code_I = &FreeMono9pt8b;
-  fonts[sans].code_BI = &FreeMono9pt8b;
+  fonts[sans].code   = u8g2_font_courR10_tf;
+  fonts[sans].code_B = u8g2_font_courR10_tf;
+  fonts[sans].code_I = u8g2_font_courR10_tf;
+  fonts[sans].code_BI = u8g2_font_courR10_tf;
 
-  fonts[sans].quote = &FreeSans9pt8b;
-  fonts[sans].quote_B = &FreeSansBold9pt8b;
-  fonts[sans].quote_I = &FreeSansOblique9pt8b;
-  fonts[sans].quote_BI = &FreeSansBoldOblique9pt8b;
+  fonts[sans].quote   = u8g2_font_helvR10_tf;
+  fonts[sans].quote_B = u8g2_font_helvB10_tf;
+  fonts[sans].quote_I = u8g2_font_helvR10_tf;
+  fonts[sans].quote_BI = u8g2_font_helvB10_tf;
 
-  fonts[sans].list = &FreeSans9pt8b;
-  fonts[sans].list_B = &FreeSansBold9pt8b;
-  fonts[sans].list_I = &FreeSansOblique9pt8b;
-  fonts[sans].list_BI = &FreeSansBoldOblique9pt8b;
+  fonts[sans].list   = u8g2_font_helvR10_tf;
+  fonts[sans].list_B = u8g2_font_helvB10_tf;
+  fonts[sans].list_I = u8g2_font_helvR10_tf;
+  fonts[sans].list_BI = u8g2_font_helvB10_tf;
 }
 
 void TXT_INIT(String inPath) {
@@ -2068,7 +2019,7 @@ void einkHandler_TXT_NEW() {
   if (updateScreen) {
     updateScreen = false;
     display.setFullWindow();
-    display.setTextColor(GxEPD_BLACK);
+    u8g2f.setForegroundColor(GxEPD_BLACK);
     editorEinkDisplay(document, currentLineNum);
     #if POCKETMAGE_HW_VERSION != 2
       EINK().forceSlowFullUpdate(true);

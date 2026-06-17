@@ -360,15 +360,15 @@ void einkHandler_LEXICON() {
         EINK().resetDisplay(); 
 
         display.drawBitmap(0, 0, _lex1, 320, 218, GxEPD_BLACK);
-        display.setTextColor(GxEPD_BLACK);
+        u8g2f.setForegroundColor(GxEPD_BLACK);
 
         // Draw Word
-        display.setFont(&FreeSerif12pt7b);
-        display.setCursor(12, 50);
-        display.print(defList[definitionIndex].first);
+        u8g2f.setFont(u8g2_font_ncenR12_tf);
+        u8g2f.setCursor(12, 50);
+        u8g2f.print(defList[definitionIndex].first);
 
         // Draw Definition with Word Wrap
-        display.setFont(&FreeSerif9pt7b);
+        u8g2f.setFont(u8g2_font_ncenR10_tf);
         
         String defText = defList[definitionIndex].second;
         int maxW = display.width() - (2 * LEX_MARGIN);
@@ -389,14 +389,12 @@ void einkHandler_LEXICON() {
               testLine += currentWord;
 
               // Measure the line with the new word added
-              int16_t x1, y1;
-              uint16_t w, h;
-              display.getTextBounds(testLine.c_str(), 0, 0, &x1, &y1, &w, &h);
+              int w = u8g2f.getUTF8Width(testLine.c_str());
 
               // If it exceeds the max width, wrap it to the next line
               if (w > maxW && currentLine.length() > 0) {
-                display.setCursor(LEX_MARGIN, cursorY);
-                display.print(currentLine);
+                u8g2f.setCursor(LEX_MARGIN, cursorY);
+                u8g2f.print(currentLine);
                 cursorY += LEX_LINE_HEIGHT;
                 currentLine = currentWord; // Start the next line with the word that didn't fit
               } else {
@@ -407,8 +405,8 @@ void einkHandler_LEXICON() {
 
             // If the character itself was a newline, force a wrap immediately
             if (c == '\n') {
-              display.setCursor(LEX_MARGIN, cursorY);
-              display.print(currentLine);
+              u8g2f.setCursor(LEX_MARGIN, cursorY);
+              u8g2f.print(currentLine);
               cursorY += LEX_LINE_HEIGHT;
               currentLine = "";
             }
@@ -420,8 +418,8 @@ void einkHandler_LEXICON() {
 
         // Flush any remaining text in the buffer after the loop ends
         if (currentLine.length() > 0) {
-          display.setCursor(LEX_MARGIN, cursorY);
-          display.print(currentLine);
+          u8g2f.setCursor(LEX_MARGIN, cursorY);
+          u8g2f.print(currentLine);
         }
 
         EINK().drawStatusBar("Type a New Word:");

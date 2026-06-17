@@ -129,10 +129,10 @@ void deepSleep(bool alternateScreenSaver) {
 
           // Show file
           display.drawBitmap(0, 0, buf, 320, 240, GxEPD_BLACK);
-          display.setFont(&FreeMonoBold9pt7b);
-          display.setTextColor(GxEPD_BLACK);
-          display.setCursor(5, display.height() - 5);
-          display.print(binFiles[fileIndex].c_str());
+          u8g2f.setFont(u8g2_font_courB10_tf);
+          u8g2f.setForegroundColor(GxEPD_BLACK);
+          u8g2f.setCursor(5, display.height() - 5);
+          u8g2f.print(binFiles[fileIndex].c_str());
 
           // Free the memory safely
           free(buf);
@@ -427,14 +427,11 @@ std::vector<String> allLines;       // All lines in TXT
 
 String vectorToString() {
   String result;
-  EINK().setTXTFont(EINK().getCurrentFont());
 
   for (size_t i = 0; i < allLines.size(); i++) {
     result += allLines[i];
 
-    int16_t x1, y1;
-    uint16_t charWidth, charHeight;
-    display.getTextBounds(allLines[i], 0, 0, &x1, &y1, &charWidth, &charHeight);
+    uint16_t charWidth = u8g2f.getUTF8Width(allLines[i].c_str());
 
     // Add newline only if the line doesn't fully use the available space
     if (charWidth < display.width() && i < allLines.size() - 1) {
@@ -446,16 +443,13 @@ String vectorToString() {
 }
 
 void stringToVector(String inputText) {
-  EINK().setTXTFont(EINK().getCurrentFont());
   allLines.clear();
   String currentLine_;
 
   for (size_t i = 0; i < inputText.length(); i++) {
     char c = inputText[i];
 
-    int16_t x1, y1;
-    uint16_t charWidth, charHeight;
-    display.getTextBounds(currentLine_, 0, 0, &x1, &y1, &charWidth, &charHeight);
+    uint16_t charWidth = u8g2f.getUTF8Width(currentLine_.c_str());
 
     // Check if new line needed
     if ((c == '\n' || charWidth >= display.width() - 5) && !currentLine_.isEmpty()) {

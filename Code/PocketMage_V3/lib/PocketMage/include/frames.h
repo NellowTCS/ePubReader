@@ -1,8 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include <Adafruit_GFX.h>
 #include <vector>
-#include <GxEPD2_BW.h>
 
 // ===================== FRAME CLASS =====================
 # define MAX_FRAMES 100
@@ -138,7 +136,7 @@ public:
   Kind kind = Kind::none;
   const TextSource* source = nullptr;  // for text frames
   const uint8_t* bitmap    = nullptr;  // for bitmap frames
-  const GFXfont *font = (GFXfont *)&FreeSerif9pt7b;
+  const uint8_t *font = nullptr;
 
   
   // base constructor for common fields

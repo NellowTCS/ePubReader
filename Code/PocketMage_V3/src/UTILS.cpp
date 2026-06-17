@@ -172,11 +172,11 @@ void checkTimeout() {
             ESP_LOGE(TAG, "text sleep mode");
             EINK().setFullRefreshAfter(FULL_REFRESH_AFTER + 1);
             display.setFullWindow();
-            display.setFont(&FreeMonoBold9pt7b);
+            u8g2f.setFont(u8g2_font_courB10_tf);
 
             display.fillRect(0, display.height() - 26, display.width(), 26, GxEPD_WHITE);
             display.drawRect(0, display.height() - 20, display.width(), 20, GxEPD_BLACK);
-            display.setCursor(4, display.height() - 6);
+            u8g2f.setCursor(4, display.height() - 6);
             
             EINK().statusBar(PM_SDAUTO().getEditingFile(), true);
 

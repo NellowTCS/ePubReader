@@ -107,7 +107,6 @@ int alignUp8(int v)   { return (v % 8) ? v + (8 - (v % 8)) : v; }
 size_t sliceThatFits(const char* s, size_t n, int maxTextWidth) {
   if (!s || n == 0) return 0;
 
-  int16_t x1, y1; uint16_t w, h;
   static char buf[256]; 
   const size_t cap = sizeof(buf) - 1;
 
@@ -118,7 +117,6 @@ size_t sliceThatFits(const char* s, size_t n, int maxTextWidth) {
   while (i < n && len < cap) {
     char c = s[i];
 
-    // newline: either end before it, or consume 1 char if it's first
     if (c == '\n' || c == '\r') return (best > 0) ? best : 1;
 
     if (c == ' ') lastSpace = i;
@@ -126,8 +124,8 @@ size_t sliceThatFits(const char* s, size_t n, int maxTextWidth) {
     buf[len++] = c;
     buf[len] = '\0';
 
-    display.getTextBounds(buf, 0, 0, &x1, &y1, &w, &h);
-    if ((int)w > maxTextWidth) break;
+    int w = u8g2f.getUTF8Width(buf);
+    if (w > maxTextWidth) break;
 
     best = i + 1;
     ++i;
@@ -231,8 +229,6 @@ void einkFramesDynamic(std::vector<Frame*> &frames, bool doFull_) {
   const int frameY = alignDown8(minY);
   const int frameW = alignUp8(maxX - minX);
   const int frameH = alignDown8(maxY - frameY);
-
-  EINK().setTXTFont(EINK().getCurrentFont());
 
   display.setPartialWindow(frameX, frameY, frameW, frameH);
   display.firstPage();
@@ -371,31 +367,24 @@ void drawFrameBox(int usableX, int usableY, int usableWidth, int usableHeight,bo
 // DRAW SINGLE LINE IN FRAME -- NOTE: remove ~C~ and ~R~ with switch to lineview flags
 void drawLineInFrame(String &srcLine, int lineIndex, Frame &frame, int usableY, bool clearLine, bool isPartial) {
     if (srcLine.length() == 0) return;
-    // get alignment and remove alignment marker
     String line = srcLine;
     bool rightAlign  = line.startsWith("~R~");
     bool centerAlign = line.startsWith("~C~");
     if (rightAlign || centerAlign) line.remove(0, 3);
-    int16_t x1, y1;
-    uint16_t lineWidth, lineHeight;
-    display.getTextBounds(line, 0, 0, &x1, &y1, &lineWidth, &lineHeight);
-    int cursorX = computeCursorX(frame, rightAlign, centerAlign, x1, lineWidth);
-    // set yRaw to frame top + spaces taken by all previous lines
+    uint16_t lineWidth = u8g2f.getUTF8Width(line.c_str());
+    int cursorX = computeCursorX(frame, rightAlign, centerAlign, 0, lineWidth);
     int yRaw = frame.top + lineIndex * (EINK().getFontHeight() + EINK().getLineSpacing());
-    // set the cursor y so that the top of the font does not get cut off by the top of the frame
-    int yDraw = yRaw + EINK().getFontHeight() - y1/2; 
-    // if clear line, clear box the size of the frame at the current line
+    int yDraw = yRaw + u8g2f.getFontAscent();
     if (clearLine) {
         int yClear = alignDown8(yRaw);
-        int clearHeight = alignUp8(EINK().getFontHeight() + EINK().getLineSpacing() + abs(y1));
+        int clearHeight = alignUp8(EINK().getFontHeight() + EINK().getLineSpacing());
         display.fillRect(frame.left, yClear,
                          display.width() - frame.left - frame.right,
                          clearHeight,
                          frame.invert ? GxEPD_BLACK :GxEPD_WHITE);
     }
-    display.setCursor(cursorX, yDraw);
-    frame.invert ? display.setTextColor(GxEPD_WHITE) : display.setTextColor(GxEPD_BLACK);
-    display.print(line);
+    u8g2f.setForegroundColor(frame.invert ? GxEPD_WHITE : GxEPD_BLACK);
+    u8g2f.drawUTF8(cursorX, yDraw, line.c_str());
 }
 
 ///////////////////////////// FRAME SCROLL FUNCTIONS
@@ -489,25 +478,20 @@ void oledScrollFrame() {
   for (long int i = previewBottom; i >= previewTop && i >= 0; --i) {
     if (i < 0 || i >= count) continue;
 
-    int16_t x1, y1;
-    uint16_t charWidth, charHeight;
     LineView lv = CurrentFrameState->source->line(i);
     String line = String(lv.ptr).substring(0, lv.len);
 
     if (line.startsWith("    ")) {
-      display.getTextBounds(line.substring(4), 0, 0, &x1, &y1, &charWidth, &charHeight);
-      int lineWidth = map(charWidth, 0, 320, 0, 49);
+      int lineWidth = map(u8g2f.getUTF8Width(line.substring(4).c_str()), 0, 320, 0, 49);
       lineWidth = constrain(lineWidth, 0, 49);
 
-      // compute Y based on distance from newest visible line
       long posFromBottom = previewBottom - i;
       int boxY = baseY - (rowStep * posFromBottom);
       if (boxY >= 0) {
         // u8g2.drawBox(68, boxY, lineWidth, 2);
       }
     } else {
-      display.getTextBounds(line, 0, 0, &x1, &y1, &charWidth, &charHeight);
-      int lineWidth = map(charWidth, 0, 320, 0, 56);
+      int lineWidth = map(u8g2f.getUTF8Width(line.c_str()), 0, 320, 0, 56);
       lineWidth = constrain(lineWidth, 0, 56);
 
       long posFromBottom = previewBottom - i;

@@ -333,17 +333,17 @@ void einkHandler_COMM() {
 
   // Top bar
   display.fillRect(0, 0, display.width(), 20, GxEPD_BLACK);
-  display.setTextColor(GxEPD_WHITE);
-  display.setFont(&FreeSans9pt7b);
+  u8g2f.setForegroundColor(GxEPD_WHITE);
+  u8g2f.setFont(u8g2_font_helvR10_tf);
 
   if (currentState == PEER_LIST) {
-    display.setCursor(4, 16);
-    display.print("Select Room");
-    display.setFont(&Font5x7Fixed);
-    display.setCursor(164, 14);
-    display.print("Me " + String(myMacStr));
-    display.setCursor(270, 14);
-    display.print("P: " + String(mesh_now_get_peer_count()));
+    u8g2f.setCursor(4, 16);
+    u8g2f.print("Select Room");
+    u8g2f.setFont(u8g2_font_5x7_tf);
+    u8g2f.setCursor(164, 14);
+    u8g2f.print("Me " + String(myMacStr));
+    u8g2f.setCursor(270, 14);
+    u8g2f.print("P: " + String(mesh_now_get_peer_count()));
 
     int totalRooms = 1 + mesh_now_get_peer_count();
     mesh_peer_t* allPeers = mesh_now_get_peers();
@@ -351,7 +351,7 @@ void einkHandler_COMM() {
     int vis = min(totalRooms, MAX_VISIBLE_LINES);
     int scrollTop = max(selPeer - vis / 2, 0);
     if (scrollTop + vis > totalRooms) scrollTop = max(totalRooms - vis, 0);
-    display.setFont(&FreeSans9pt7b);
+    u8g2f.setFont(u8g2_font_helvR10_tf);
     for (int i = 0; i < vis; i++) {
       int idx = scrollTop + i;
       if (idx >= totalRooms) break;
@@ -373,12 +373,12 @@ void einkHandler_COMM() {
       }
       if (selected) {
         display.fillRect(2, yPos - 9, display.width() - 12, 13, GxEPD_BLACK);
-        display.setTextColor(GxEPD_WHITE);
+        u8g2f.setForegroundColor(GxEPD_WHITE);
       } else {
-        display.setTextColor(GxEPD_BLACK);
+        u8g2f.setForegroundColor(GxEPD_BLACK);
       }
-      display.setCursor(8, yPos);
-      display.print(label);
+      u8g2f.setCursor(8, yPos);
+      u8g2f.print(label);
     }
     // Scrollbar
     if (totalRooms > vis) {
@@ -391,18 +391,18 @@ void einkHandler_COMM() {
     }
   } else {
     if (chatMode == LOCAL_CHAT) {
-      display.setCursor(4, 16);
-      display.print("Local Chat");
+      u8g2f.setCursor(4, 16);
+      u8g2f.print("Local Chat");
     } else {
       String name = displayName(peerMacStr);
-      display.setCursor(4, 16);
-      display.print("> " + name);
+      u8g2f.setCursor(4, 16);
+      u8g2f.print("> " + name);
     }
-    display.setFont(&Font5x7Fixed);
-    display.setCursor(164, 14);
-    display.print(chatMode == LOCAL_CHAT ? "ESP-NOW" : "Direct");
-    display.setCursor(270, 14);
-    display.print("P: " + String(mesh_now_get_peer_count()));
+    u8g2f.setFont(u8g2_font_5x7_tf);
+    u8g2f.setCursor(164, 14);
+    u8g2f.print(chatMode == LOCAL_CHAT ? "ESP-NOW" : "Direct");
+    u8g2f.setCursor(270, 14);
+    u8g2f.print("P: " + String(mesh_now_get_peer_count()));
   }
 
   // Separator line
@@ -410,37 +410,35 @@ void einkHandler_COMM() {
 
   // Message area (CHAT_VIEW / CHAT_COMPOSE only)
   if (currentState != PEER_LIST) {
-    display.setTextColor(GxEPD_BLACK);
-    display.setFont(&Font5x7Fixed);
+    u8g2f.setForegroundColor(GxEPD_BLACK);
+    u8g2f.setFont(u8g2_font_5x7_tf);
     int y = 30;
     int lineH = 11;
     for (int i = scrollOff; i < msgCount && y < 220; i++) {
       ChatMsg* m = &msgs[i];
       String prefix = displayName(m->sender) + ": ";
-      display.setCursor(2, y);
-      display.print(prefix);
-      int16_t x1, y1;
-      uint16_t pw, ph;
-      display.getTextBounds(prefix, 0, 0, &x1, &y1, &pw, &ph);
+      u8g2f.setCursor(2, y);
+      u8g2f.print(prefix);
+      int pw = u8g2f.getUTF8Width(prefix.c_str());
       int cx = 2 + pw;
-      display.setCursor(cx, y);
-      display.print(m->content);
+      u8g2f.setCursor(cx, y);
+      u8g2f.print(m->content);
       y += lineH;
     }
   }
 
   // Status bar
   display.drawFastHLine(0, 220, display.width(), GxEPD_BLACK);
-  display.setCursor(4, 234);
-  display.setFont(&Font5x7Fixed);
+  u8g2f.setCursor(4, 234);
+  u8g2f.setFont(u8g2_font_5x7_tf);
   if (currentState == CHAT_COMPOSE) {
-    display.print("> ");
-    display.print(inputBuf);
+    u8g2f.print("> ");
+    u8g2f.print(inputBuf);
   } else if (currentState == CHAT_VIEW) {
-    if (msgCount == 0) display.print("No messages yet. Press Enter to type.");
-    else display.print("Enter: type  |  Up/Dn: scroll  |  Esc: back");
+    if (msgCount == 0) u8g2f.print("No messages yet. Press Enter to type.");
+    else u8g2f.print("Enter: type  |  Up/Dn: scroll  |  Esc: back");
   } else {
-    display.print("FN+7/6: up/dn  |  Enter: sel  |  FN+<-: home");
+    u8g2f.print("FN+7/6: up/dn  |  Enter: sel  |  FN+<-: home");
   }
 
   EINK().refresh();

@@ -227,18 +227,16 @@ void loadAndDrawAppIcon(int x, int y, int otaIndex, bool showName, int maxNameCh
         appNameStr = appNameStr.substring(0, maxNameChars);
     }
 
-    display.setFont(&FreeSerif9pt7b);
-    display.setTextColor(GxEPD_BLACK);
+    u8g2f.setFont(u8g2_font_ncenR10_tf);
+    u8g2f.setForegroundColor(GxEPD_BLACK);
 
-    int16_t x1, y1;
-    uint16_t w, h;
-    display.getTextBounds(appNameStr, 0, 0, &x1, &y1, &w, &h);
+    int w = u8g2f.getUTF8Width(appNameStr.c_str());
 
     int tx = x + (40 - w) / 2;
     int ty = y + 40 + 13;
 
-    display.setCursor(tx, ty);
-    display.print(appNameStr);
+    u8g2f.setCursor(tx, ty);
+    u8g2f.print(appNameStr);
   }
 
   if (SAVE_POWER) pocketmage::setCpuSpeed(POWER_SAVE_FREQ);

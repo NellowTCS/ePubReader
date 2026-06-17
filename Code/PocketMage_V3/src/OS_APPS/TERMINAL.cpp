@@ -36,7 +36,7 @@ static void printUTF8ToEink(const String& s, int maxChars = 9999) {
   int charCount = 0;
   while (i < s.length() && charCount < maxChars) {
     uint16_t unicode = decodeUTF8(s.c_str(), &i, s.length());
-    display.write(mapUnicodeToFontIndex(unicode));
+    u8g2f.print((char)unicode);
     charCount++;
   }
 }
@@ -283,11 +283,11 @@ void updateTerminalDisp() {
 
   for (int i = startIdx; i < endIdx; i++) {
     const String& s = terminalOutputs[i];
-    display.setTextColor(fgColor);
-    if (termLargeFont) display.setFont(&FreeMonoBold9pt7b);
-    else display.setFont(&Font5x7Fixed);
-    display.setCursor(5, y);
-    printUTF8ToEink(s, termMaxLineLen); // Use the length limiter inside our renderer
+    u8g2f.setForegroundColor(fgColor);
+    if (termLargeFont) u8g2f.setFont(u8g2_font_courB10_tf);
+    else u8g2f.setFont(u8g2_font_5x7_tf);
+    u8g2f.setCursor(5, y);
+    u8g2f.print(s.c_str());
     y += yStep;
   }
 
@@ -309,7 +309,7 @@ void updateTerminalDisp() {
     display.drawFastHLine(barX, 0,barWidth, bgColor);
   }
 
-  display.setTextColor(GxEPD_BLACK);
+  u8g2f.setForegroundColor(GxEPD_BLACK);
   EINK().refresh();
 }
 
@@ -1224,26 +1224,26 @@ void wr_inkText(WRContext* c, const WRValue* argv, int argn, WRValue& ret, void*
   bool color        = (argv[3].asInt() != 0);
   const char* text  = argv[4].asString(buf, 1024);
   
-  if (color) display.setTextColor(GxEPD_BLACK);
-  else display.setTextColor(GxEPD_WHITE);
+  if (color) u8g2f.setForegroundColor(GxEPD_BLACK);
+  else u8g2f.setForegroundColor(GxEPD_WHITE);
 
   switch (size) {
     case 1:
-      display.setFont(&Font5x7Fixed);
+      u8g2f.setFont(u8g2_font_5x7_tf);
       break;
     case 2:
-      display.setFont(&FreeMonoBold9pt7b);
+      u8g2f.setFont(u8g2_font_courB10_tf);
       break;
     case 3:
-      display.setFont(&FreeMonoBold12pt7b);
+      u8g2f.setFont(u8g2_font_courB14_tf);
       break;
     default:
-      display.setFont(&FreeMonoBold9pt7b);
+      u8g2f.setFont(u8g2_font_courB10_tf);
       break;
   }
   
-  display.setCursor(x_origin, y_origin);
-  printUTF8ToEink(text);
+  u8g2f.setCursor(x_origin, y_origin);
+  u8g2f.print(text);
 }
 
 // ----- OLED Display ----- //
@@ -1894,14 +1894,14 @@ void einkHandler_TERMINAL() {
 
             if (i == currentPotionLine) {
               display.fillRect(0, y - 9, display.width(), 11, fgColor);
-              display.setTextColor(bgColor);
+              u8g2f.setForegroundColor(bgColor);
             } else
-              display.setTextColor(fgColor);
-            display.setFont(&Font5x7Fixed);
-            display.setCursor(5, y);
-            display.print("[" + lineNum + "]");
-            display.setCursor(35, y);
-            printUTF8ToEink(s);
+              u8g2f.setForegroundColor(fgColor);
+            u8g2f.setFont(u8g2_font_5x7_tf);
+            u8g2f.setCursor(5, y);
+            u8g2f.print("[" + lineNum + "]");
+            u8g2f.setCursor(35, y);
+            u8g2f.print(s.c_str());
             y += 10;
           }
         } 
@@ -1920,14 +1920,14 @@ void einkHandler_TERMINAL() {
 
               if (i == currentPotionLine) {
                 display.fillRect(0, y - 9, display.width(), 11, fgColor);
-                display.setTextColor(bgColor);
+                u8g2f.setForegroundColor(bgColor);
               } else
-                display.setTextColor(fgColor);
-              display.setFont(&Font5x7Fixed);
-              display.setCursor(5, y);
-              display.print("[" + lineNum + "]");
-              display.setCursor(35, y);
-              printUTF8ToEink(s);
+                u8g2f.setForegroundColor(fgColor);
+              u8g2f.setFont(u8g2_font_5x7_tf);
+              u8g2f.setCursor(5, y);
+              u8g2f.print("[" + lineNum + "]");
+              u8g2f.setCursor(35, y);
+              u8g2f.print(s.c_str());
               y += 10;
             }
           }
@@ -1945,21 +1945,21 @@ void einkHandler_TERMINAL() {
 
               if (i == currentPotionLine) {
                 display.fillRect(0, y - 9, display.width(), 11, fgColor);
-                display.setTextColor(bgColor);
+                u8g2f.setForegroundColor(bgColor);
               } else
-                display.setTextColor(fgColor);
-              display.setFont(&Font5x7Fixed);
-              display.setCursor(5, y);
-              display.print("[" + lineNum + "]");
-              display.setCursor(35, y);
-              printUTF8ToEink(s);
+                u8g2f.setForegroundColor(fgColor);
+              u8g2f.setFont(u8g2_font_5x7_tf);
+              u8g2f.setCursor(5, y);
+              u8g2f.print("[" + lineNum + "]");
+              u8g2f.setCursor(35, y);
+              u8g2f.print(s.c_str());
               y += 10;
             }
           }
         }
 
         EINK().refresh();
-        display.setTextColor(GxEPD_BLACK);
+        u8g2f.setForegroundColor(GxEPD_BLACK);
       }
 
       break;

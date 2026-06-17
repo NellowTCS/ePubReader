@@ -967,13 +967,13 @@ void drawCalendarMonth(int monthOffset) {
 
     // Current day
     if (dayNum == now.day() && monthOffset == 0) {
-      display.setFont(&FreeSerifBold9pt7b);
+      u8g2f.setFont(u8g2_font_ncenB10_tf);
     }
-    else display.setFont(&FreeSerif9pt7b);
+    else u8g2f.setFont(u8g2_font_ncenR10_tf);
     
-    display.setTextColor(GxEPD_BLACK);
-    display.setCursor(x + 6, y + 15); 
-    display.print(dayNum);
+    u8g2f.setForegroundColor(GxEPD_BLACK);
+    u8g2f.setCursor(x + 6, y + 15); 
+    u8g2f.print(dayNum);
 
     // Draw icon if there are events on day
     String YYYYMMDD = intToYYYYMMDD(year, month, dayNum);
@@ -982,9 +982,9 @@ void drawCalendarMonth(int monthOffset) {
 
     // Events found
     if (numEvents > 2) {
-      display.setFont(&Font5x7Fixed);
-      display.setCursor(x + 32, y + 16);
-      display.print(String(numEvents));
+      u8g2f.setFont(u8g2_font_5x7_tf);
+      u8g2f.setCursor(x + 32, y + 16);
+      u8g2f.print(String(numEvents));
     }
     else if (numEvents > 1) {
       display.drawBitmap(x + 29, y + 8, _eventMarker1, 10, 10, GxEPD_BLACK);
@@ -1040,11 +1040,11 @@ void drawCalendarWeek(int weekOffset) {
     String YYYYMMDD = intToYYYYMMDD(y, m, d);
 
     // Draw date
-    display.setFont(&FreeSerif9pt7b);
-    display.setTextColor(GxEPD_BLACK);
-    display.setCursor(9 + (i * 44), 62);
+    u8g2f.setFont(u8g2_font_ncenR10_tf);
+    u8g2f.setForegroundColor(GxEPD_BLACK);
+    u8g2f.setCursor(9 + (i * 44), 62);
     String dateStr = String(m) + "/" + String(d);
-    display.print(dateStr);
+    u8g2f.print(dateStr);
 
     // Load and draw events
     int eventCount = checkEvents(YYYYMMDD, false);
@@ -1060,15 +1060,15 @@ void drawCalendarWeek(int weekOffset) {
       String eventName = dayEvents[j][0].substring(0, 6);
 
       // Print Start Time
-      display.setFont(&Font3x7FixedNum);
-      display.setTextColor(GxEPD_BLACK);
-      display.setCursor(12 + (i * 44), 80 + (j * 23));
-      display.print(startTime);
+      u8g2f.setFont(u8g2_font_4x6_tf);
+      u8g2f.setForegroundColor(GxEPD_BLACK);
+      u8g2f.setCursor(12 + (i * 44), 80 + (j * 23));
+      u8g2f.print(startTime);
 
       // Print Event Name
-      display.setFont(&Font5x7Fixed);
-      display.setCursor(12 + (i * 44), 89 + (j * 23));
-      display.print(eventName);
+      u8g2f.setFont(u8g2_font_5x7_tf);
+      u8g2f.setCursor(12 + (i * 44), 89 + (j * 23));
+      u8g2f.print(eventName);
     }
   }
 }
@@ -1473,25 +1473,25 @@ void einkHandler_CALENDAR() {
         EINK().resetDisplay();
 
         display.drawBitmap(0, 0, calendar_allArray[2], 320, 218, GxEPD_BLACK);
-        display.setFont(&FreeSerif9pt7b);
+        u8g2f.setFont(u8g2_font_ncenR10_tf);
 
-        display.setCursor(106, 68);
-        display.print(newEventName);
+        u8g2f.setCursor(106, 68);
+        u8g2f.print(newEventName);
 
-        display.setCursor(106, 90);
-        display.print(formatDateDisplay(newEventStartDate));
+        u8g2f.setCursor(106, 90);
+        u8g2f.print(formatDateDisplay(newEventStartDate));
 
-        display.setCursor(106, 112);
-        display.print(newEventStartTime);
+        u8g2f.setCursor(106, 112);
+        u8g2f.print(newEventStartTime);
 
-        display.setCursor(106, 134);
-        display.print(newEventDuration);
+        u8g2f.setCursor(106, 134);
+        u8g2f.print(newEventDuration);
         
-        display.setCursor(106, 156);
-        display.print(newEventRepeat);
+        u8g2f.setCursor(106, 156);
+        u8g2f.print(newEventRepeat);
 
-        display.setCursor(106, 178);
-        display.print(newEventNote);
+        u8g2f.setCursor(106, 178);
+        u8g2f.print(newEventNote);
 
         switch (newEventState) {
           case 0: EINK().drawStatusBar("Enter Event Name on OLED"); break;
@@ -1516,25 +1516,25 @@ void einkHandler_CALENDAR() {
 
         EINK().drawStatusBar("Type 1-6,(D)el, or (S)ave");
         display.drawBitmap(0, 0, calendar_allArray[3], 320, 218, GxEPD_BLACK);
-        display.setFont(&FreeSerif9pt7b);
+        u8g2f.setFont(u8g2_font_ncenR10_tf);
 
-        display.setCursor(106, 68);
-        display.print(newEventName);
+        u8g2f.setCursor(106, 68);
+        u8g2f.print(newEventName);
 
-        display.setCursor(106, 90);
-        display.print(formatDateDisplay(newEventStartDate));
+        u8g2f.setCursor(106, 90);
+        u8g2f.print(formatDateDisplay(newEventStartDate));
 
-        display.setCursor(106, 112);
-        display.print(newEventStartTime);
+        u8g2f.setCursor(106, 112);
+        u8g2f.print(newEventStartTime);
 
-        display.setCursor(106, 134);
-        display.print(newEventDuration);
+        u8g2f.setCursor(106, 134);
+        u8g2f.print(newEventDuration);
         
-        display.setCursor(106, 156);
-        display.print(newEventRepeat);
+        u8g2f.setCursor(106, 156);
+        u8g2f.print(newEventRepeat);
 
-        display.setCursor(106, 178);
-        display.print(newEventNote);
+        u8g2f.setCursor(106, 178);
+        u8g2f.print(newEventNote);
 
         #if POCKETMAGE_HW_VERSION != 2
           EINK().forceSlowFullUpdate(true);
@@ -1557,10 +1557,10 @@ void einkHandler_CALENDAR() {
         EINK().drawStatusBar("Events 1-7 or (N)ew");
         display.drawBitmap(0, 0, calendar_allArray[CurrentCalendarState], 320, 218, GxEPD_BLACK);
 
-        display.setFont(&FreeSerif9pt7b);
-        display.setTextColor(GxEPD_BLACK);
-        display.setCursor(9 + (44*(CurrentCalendarState - 4)), 59);
-        display.print(String(currentMonth) + "/" + String(currentDate));
+        u8g2f.setFont(u8g2_font_ncenR10_tf);
+        u8g2f.setForegroundColor(GxEPD_BLACK);
+        u8g2f.setCursor(9 + (44*(CurrentCalendarState - 4)), 59);
+        u8g2f.print(String(currentMonth) + "/" + String(currentDate));
 
         String YYYYMMDD = intToYYYYMMDD(currentYear, currentMonth, currentDate);
         int eventCount = checkEvents(YYYYMMDD, false);
@@ -1575,13 +1575,13 @@ void einkHandler_CALENDAR() {
           String repeatCode = dayEvents[j][4];
           String bottomInfo = "Starts: " + startTime + ", Dur: " + duration + ", Rep: " + repeatCode;
 
-          display.setFont(&Font5x7Fixed);
-          display.setCursor(48, 74 + (j * 19));
-          display.print(name);
+          u8g2f.setFont(u8g2_font_5x7_tf);
+          u8g2f.setCursor(48, 74 + (j * 19));
+          u8g2f.print(name);
 
-          display.setFont(&Font5x7Fixed);
-          display.setCursor(48, 82 + (j * 19));
-          display.print(bottomInfo);
+          u8g2f.setFont(u8g2_font_5x7_tf);
+          u8g2f.setCursor(48, 82 + (j * 19));
+          u8g2f.print(bottomInfo);
         }
 
         #if POCKETMAGE_HW_VERSION != 2
