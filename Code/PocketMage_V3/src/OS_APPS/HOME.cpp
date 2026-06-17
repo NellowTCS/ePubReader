@@ -231,6 +231,7 @@ void drawHome() {
     u8g2f.print(appStateNames[i]);
   }
   u8g2f.setFont(u8g2_font_courB10_tf);
+  u8g2f.setFontMode(1);
 
   // Draw sideload app rounded rect
   //display.drawRoundRect(startX-15, (3*spacingY) - iconSize, (5*spacingX)+10, spacingY + 10, 15, GxEPD_BLACK);

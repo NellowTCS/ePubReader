@@ -52,6 +52,7 @@ inline uint16_t decodeUTF8(const char* str, uint16_t* index, uint16_t len) {
 inline uint16_t getFastCharWidth(uint16_t unicode, const uint8_t* font) {
   if (!font) return 6;
   u8g2f.setFont(font);
+  u8g2f.setFontMode(1);
   char tmp[5];
   if (unicode < 0x80) {
     tmp[0] = unicode; tmp[1] = 0;
@@ -72,6 +73,7 @@ inline uint16_t getFastCharWidth(uint16_t unicode, const uint8_t* font) {
 inline uint16_t getFastCharHeight(const uint8_t* font) {
   if (!font) return 8;
   u8g2f.setFont(font);
+  u8g2f.setFontMode(1);
   return u8g2f.getFontAscent() - u8g2f.getFontDescent();
 }
 
