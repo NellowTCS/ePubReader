@@ -15,7 +15,7 @@ public:
 
   // Main methods
   void updateScrollFromTouch();
-  bool updateScroll(int maxScroll, ulong& lineScroll);
+  bool updateScroll(int maxScroll, ulong& lineScroll, int stepSize = 1);
   // getters 
   long int getDynamicScroll() const { return dynamicScroll_; }
   void setDynamicScroll(long int val) { dynamicScroll_ = val; }

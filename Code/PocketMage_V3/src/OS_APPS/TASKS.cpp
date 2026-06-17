@@ -222,7 +222,8 @@ void processKB_TASKS() {
   // Handle hardware scrollbar slider
   if (CurrentTasksState == TASKS0 || CurrentTasksState == TASKS0_NEWTASK) {
     int maxScroll = tasks.size() > MAX_FILES ? tasks.size() - MAX_FILES : 0;
-    if (TOUCH().updateScroll(maxScroll, taskScrollIndex)) {
+    int scrollStep = (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) ? 5 : 1;
+    if (TOUCH().updateScroll(maxScroll, taskScrollIndex, scrollStep)) {
       newState = true;
     }
   }

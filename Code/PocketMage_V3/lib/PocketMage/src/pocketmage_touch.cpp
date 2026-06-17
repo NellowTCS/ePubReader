@@ -59,7 +59,7 @@ void PocketmageTOUCH::updateScrollFromTouch() {
   }
 }
 
-bool PocketmageTOUCH::updateScroll(int maxScroll, ulong& lineScroll) {
+bool PocketmageTOUCH::updateScroll(int maxScroll, ulong& lineScroll, int stepSize) {
 
   static int lastTouchPos = -1;
   static unsigned long lastTouchTime = 0;
@@ -90,10 +90,10 @@ bool PocketmageTOUCH::updateScroll(int maxScroll, ulong& lineScroll) {
         // REVERSED SCROLL DIRECTION:
         if (touchPos < lastTouchPos && lineScroll < maxScroll) {
           prev_lineScroll = lineScroll;
-          lineScroll++;
+          lineScroll = min(lineScroll + stepSize, (ulong)maxScroll);
         } else if (touchPos > lastTouchPos && lineScroll > 0) {
           prev_lineScroll = lineScroll;
-          lineScroll--;
+          lineScroll = (lineScroll >= (ulong)stepSize) ? lineScroll - stepSize : 0;
         }
       }
     }

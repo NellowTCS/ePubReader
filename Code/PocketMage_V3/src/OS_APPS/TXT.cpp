@@ -2092,7 +2092,8 @@ void processKB_TXT_NEW() {
   }
 
   if (CurrentTXTState_NEW == TXT_ || CurrentTXTState_NEW == JOURNAL_MODE) {
-    if (TOUCH().updateScroll(document.lineCount, currentLineNum)) {
+    int scrollStep = (KB().getKeyboardState() == SHIFT || KB().getKeyboardState() == FN_SHIFT) ? 5 : 1;
+    if (TOUCH().updateScroll(document.lineCount, currentLineNum, scrollStep)) {
       updateScreen = true; 
     }
   }
