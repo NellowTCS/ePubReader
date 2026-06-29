@@ -364,6 +364,12 @@ String textPrompt(String promptText, String prefix) {
     updateBattState();
     KB().checkUSBKB();
 
+    static int lastBattState = -1;
+    if (battState != lastBattState) {
+      redraw = true;
+      lastBattState = battState;
+    }
+
     int currentMillis = millis();
     String left = "";
     String right = "";
